@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ウィンターカップへの道</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="header">
+    <h1>🏀 ウィンターカップへの道</h1>
+    <div class="date-box">
+      <span id="date-label">4月 1週目</span>
+      <span id="weeks-left" class="weeks-left"></span>
+    </div>
+
+    <div class="save-box">
+      <span id="save-info" class="save-info">セーブなし</span>
+      <button id="save-btn" class="save-btn">💾 セーブ</button>
+      <button id="load-btn" class="save-btn">📂 ロード</button>
+      <button id="reset-btn" class="save-btn danger">↺ 最初から</button>
+    </div>
+  </header>
+
+  <!-- 年間カレンダー。先の行事が見えるから、計画が立てられる -->
+  <section class="panel calendar-panel">
+    <h2>年間カレンダー</h2>
+    <div id="calendar" class="calendar"></div>
+  </section>
+
+  <!-- 特殊イベントが起きたときだけ出る -->
+  <div id="event-banner" class="event-banner hidden"></div>
+
+  <!-- 活動記録。毎週いちばん読むものなので、カレンダーの下に大きく置く -->
+  <section class="panel log-panel">
+    <h2>活動記録</h2>
+    <div class="log-layout">
+      <!-- 三宅の今週のひとこと -->
+      <div id="manager-comment" class="manager-comment"></div>
+      <div id="log" class="log"></div>
+    </div>
+  </section>
+
+  <main class="layout">
+
+    <!-- 左：部員一覧 -->
+    <section class="panel">
+      <h2>部員一覧</h2>
+      <div id="roster" class="roster"></div>
+    </section>
+
+    <!-- 右：週の進行・一括設定・メニュー表・ログ -->
+    <aside class="panel">
+      <h2>今週の指示</h2>
+      <div id="upcoming"></div>
+      <button id="next-week" class="next-btn">▶ 1週間 練習する</button>
+      <button id="open-match" class="match-btn">🏀 練習試合を組む</button>
+      <div class="menu-tabs">
+        <button id="open-notebook" class="match-btn subtle">📔 三宅の手帳</button>
+        <button id="open-history" class="match-btn subtle">📋 戦歴</button>
+      </div>
+
+      <div class="bulk">
+        <label for="bulk-select">全員に同じメニュー</label>
+        <select id="bulk-select"></select>
+      </div>
+
+      <h2>特殊戦術</h2>
+      <div id="tactic-progress"></div>
+
+      <h2>メニュー表</h2>
+      <div id="menu-list" class="menu-list"></div>
+    </aside>
+
+  </main>
+
+  <!-- 試合画面。ふだんは隠れていて、試合のときだけ前面に出る -->
+  <div id="match-overlay" class="overlay hidden">
+    <div class="match-panel" id="match-panel"></div>
+  </div>
+
+  <!-- 戦歴 -->
+  <div id="history-overlay" class="overlay hidden">
+    <div class="match-panel" id="history-panel"></div>
+  </div>
+
+  <!-- 選択式イベント。選ぶまで先に進めない -->
+  <div id="choice-overlay" class="overlay hidden">
+    <div class="choice-panel" id="choice-panel"></div>
+  </div>
+
+  <!-- 月頭のメインストーリー。読ませたいので画面の前に出す -->
+  <div id="story-overlay" class="overlay hidden">
+    <div class="choice-panel story-panel" id="story-panel"></div>
+  </div>
+
+  <!-- 選手詳細（マネージャーの手帳） -->
+  <div id="profile-overlay" class="overlay hidden">
+    <div class="match-panel" id="profile-panel"></div>
+  </div>
+
+  <!-- エンディング。1年の終わりに1度だけ -->
+  <div id="ending-overlay" class="overlay hidden">
+    <div class="ending-panel" id="ending-panel"></div>
+  </div>
+
+  <!-- 読み込む順番に意味がある。
+       game.js が土台（選手データと週の進行）、
+       events.js と match.js はその上で動く。
+       history.js は記録を見せるだけなので最後。 -->
+  <script src="game.js"></script>
+  <script src="events.js"></script>
+  <script src="match.js"></script>
+  <script src="history.js"></script>
+  <script src="profile.js"></script>
+  <script src="ending.js"></script>
+</body>
+</html>
