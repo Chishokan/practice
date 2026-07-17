@@ -203,29 +203,40 @@ function getPlayer(name) {
 // 数字が旧仕様より大きいのは、伸びる人数が減ったから。
 // 旧仕様は8人全員が毎週フルで練習していた。今は名前が出た平均2.4人だけ。
 // 同じ数字のままだと1年でOVR 58までしか行かず、12月に帝王と戦えない。
+//
+// 対象は最大3つまで。そして5つの練習が別々のものになるようにしてある。
+//   主に伸ばすもの（その練習の存在理由）
+//     フィジカル → パワー・ジャンプ
+//     ランニング → スタミナ
+//     アジリティ → スピード
+//     シュート   → テクニック
+//     戦術       → バスケIQ  ← ここでしか伸びない
+//   バスケIQを戦術だけにしているのは、5つに役割を配りきるため。
+//   シュートと戦術が両方「テクニック＋IQ」だった時期があり、
+//   それだと2つが同じ練習になってしまい、選ぶ意味が消えていた。
 const MENUS = [
   {
     key: "physical", name: "フィジカル", icon: "🏋",
     desc: "当たり負けしない体と、跳ぶ力を作る。",
-    effects: { power: 2.9, jump: 2.1 },
+    effects: { power: 2.9, jump: 2.0, stamina: 0.7 },
     load: 16,
   },
   {
     key: "running", name: "ランニング", icon: "🏃",
     desc: "走り込み。地味だが、40分走り切る体になる。",
-    effects: { stamina: 3.2, speed: 1.5 },
+    effects: { stamina: 3.2, speed: 1.4 },
     load: 18,
   },
   {
     key: "agility", name: "アジリティ", icon: "⚡",
     desc: "初速と切り返し。抜く力と、追う力。",
-    effects: { speed: 3.2, jump: 1.2 },
+    effects: { speed: 3.2, jump: 1.0, tech: 0.5 },
     load: 15,
   },
   {
     key: "shooting", name: "シュート", icon: "🎯",
-    desc: "ハンドリングとシューティング。反復あるのみ。",
-    effects: { tech: 3.2, iq: 0.8 },
+    desc: "ひたすら打ち込む。手首と、跳ぶ高さ。",
+    effects: { tech: 3.2, jump: 0.7, power: 0.4 },
     load: 11,
   },
   {
@@ -234,8 +245,8 @@ const MENUS = [
     // IQは全部の試合能力に効くので、それを無限に回せると
     // 「戦術だけ選び続ける」が最適解になり、他の4つが死ぬ。
     key: "tactics", name: "戦術", icon: "🧠",
-    desc: "映像と読み合わせ。座学だが、頭も疲れる。",
-    effects: { iq: 2.4, tech: 0.8 },
+    desc: "映像と読み合わせ。ここでしかIQは伸びない。",
+    effects: { iq: 2.6, tech: 0.6 },
     load: 9,
   },
   {
@@ -863,8 +874,7 @@ function renderMenus() {
         <div class="train-head">
           <span class="train-icon">${menu.icon}</span>
           <span class="train-name">${menu.name}</span>
-          ${menu.always ? "" : `<span class="train-lv lv${level}">Lv.${level}</span>`}
-          <span class="menu-load ${netLoad(menu) > 0 ? "" : "recover"}">${loadText(menu)}</span>
+          ${menu.always ? "" : `<span class="train-lv lv${level}">Lv${level}</span>`}
         </div>
 
         <div class="train-tags">${menuTags(menu)}</div>
@@ -872,20 +882,18 @@ function renderMenus() {
         <div class="train-faces">
           ${faces || (menu.always
             ? ""
-            : `<span class="train-none">今週は誰も来ていない</span>`)}
+            : `<span class="train-none">誰も来ていない</span>`)}
         </div>
 
         <div class="train-foot">
           ${menu.always
             ? `<span class="train-effect">全員が休む</span>`
-            : `<span class="train-count ${attending.length >= 3 ? "many" : ""}">
-                 ${attending.length}人
-               </span>
-               <span class="train-effect">
-                 ${attending.length ? `伸び ×${mult.toFixed(2)}` : "—"}
-               </span>`}
-          ${next ? `<span class="train-next">あと${next}回でLv.${level + 1}</span>` : ""}
+            : `<span class="train-count ${attending.length >= 3 ? "many" : ""}">${attending.length}人</span>
+               <span class="train-effect">${attending.length ? `×${mult.toFixed(2)}` : "—"}</span>`}
+          <span class="menu-load ${netLoad(menu) > 0 ? "" : "recover"}">${loadText(menu)}</span>
         </div>
+
+        ${next ? `<div class="train-next">あと${next}回でLv${level + 1}</div>` : ""}
       </button>`;
   }).join("");
 

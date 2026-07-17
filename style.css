@@ -1950,13 +1950,16 @@ button, select { -webkit-tap-highlight-color: transparent; }
   margin-left: 10px;
 }
 
+/* 6枚を横一列に並べられるのは、かなり広い画面のときだけ。
+   狭いところで無理に列数を保つと、カードが100px台になって
+   日本語が1文字ずつ縦に折り返される。列数のほうを減らす。 */
 .train-board {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   gap: 8px;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1400px) {
   .train-board { grid-template-columns: repeat(3, 1fr); }
 }
 
@@ -1997,12 +2000,23 @@ button, select { -webkit-tap-highlight-color: transparent; }
   align-items: center;
   gap: 5px;
   margin-bottom: 6px;
+  /* 名前を折り返させない。日本語は1文字ずつ縦に割れてしまうので、
+     縮めるくらいなら列数を減らす。 */
+  white-space: nowrap;
 }
 
-.train-icon { font-size: 16px; }
-.train-name { font-size: 13px; font-weight: bold; }
+.train-icon { font-size: 16px; flex: 0 0 auto; }
+
+.train-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: bold;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .train-lv {
+  flex: 0 0 auto;
   background: var(--line);
   border-radius: 3px;
   font-size: 9px;
@@ -2017,8 +2031,6 @@ button, select { -webkit-tap-highlight-color: transparent; }
   font-weight: bold;
 }
 
-.train-head .menu-load { margin-left: auto; font-size: 9px; }
-
 .train-tags {
   display: flex;
   flex-wrap: wrap;
@@ -2026,7 +2038,11 @@ button, select { -webkit-tap-highlight-color: transparent; }
   margin-bottom: 8px;
 }
 
-.train-tags .tag { font-size: 9px; padding: 0 4px; }
+.train-tags .tag {
+  font-size: 9px;
+  padding: 0 4px;
+  white-space: nowrap;
+}
 
 /* 今週の顔ぶれ。ここを見て選ぶので、いちばん場所を取る。 */
 .train-faces {
@@ -2064,6 +2080,7 @@ button, select { -webkit-tap-highlight-color: transparent; }
   border-top: 1px solid var(--line);
   font-size: 10px;
   padding-top: 6px;
+  white-space: nowrap;
 }
 
 .train-count { color: var(--muted); }
@@ -2071,8 +2088,17 @@ button, select { -webkit-tap-highlight-color: transparent; }
 /* 人が集まっている練習は当たり。目に留まるように。 */
 .train-count.many { color: #6ee787; font-weight: bold; }
 
-.train-effect { color: var(--accent); }
-.train-next { color: #4e5866; margin-left: auto; font-size: 9px; }
+.train-effect { color: var(--accent); font-weight: bold; }
+
+/* 疲労は右端に寄せる */
+.train-foot .menu-load { margin-left: auto; font-size: 9px; }
+
+.train-next {
+  color: #4e5866;
+  font-size: 9px;
+  margin-top: 3px;
+  white-space: nowrap;
+}
 
 /* 部員カードの「今週どこに出ているか」 */
 .appears {
@@ -2365,6 +2391,16 @@ button, select { -webkit-tap-highlight-color: transparent; }
 
   /* --- 活動記録 --- */
   .log { height: 220px; }
+
+  /* --- 練習盤 --- */
+  /* 3列だとカードが110pxしかなく、練習名が1文字ずつ縦に折り返された。
+     2列にすれば1枚あたり180px前後になり、横書きで収まる。 */
+  .train-board { grid-template-columns: repeat(2, 1fr); }
+
+  .train-card { padding: 9px 8px; }
+  .train-name { font-size: 12px; }
+  .train-faces { min-height: 42px; }
+  .face { width: 28px; }
 
   /* --- 部員カード --- */
   .roster { grid-template-columns: 1fr; }
