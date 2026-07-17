@@ -164,7 +164,6 @@ sortRoster();
 function addPlayer(data) {
   const player = initPlayer({ ...data });
   players.push(player);
-  state.assign[player.name] = DEFAULT_MENU;
   sortRoster();
   return player;
 }
@@ -173,7 +172,6 @@ function addPlayer(data) {
 function removePlayer(player) {
   const index = players.indexOf(player);
   if (index >= 0) players.splice(index, 1);
-  delete state.assign[player.name];
   // 試合画面が抱えている参照も切っておく
   if (matchState.lineup) {
     matchState.lineup = matchState.lineup.filter(p => p !== player);
@@ -187,147 +185,177 @@ function getPlayer(name) {
 
 
 // ---- 5. 練習メニュー ---------------------------------
+//
+// 練習は5種類＋休憩。全員が同じ練習をする。
+//
+// 毎週、それぞれの練習に選手の名前が並ぶ。誰がどこに出るかは抽選で、
+// 選手ごとに出やすい練習が違う（affinity）。
+// プレイヤーがやるのは「今週どれを選ぶか」だけ。
+//
+// 面白さの中心は、練習の中身ではなく「並びを見て選ぶ」ことにある。
+//   ・伸ばしたい練習に人が集まっている週は当たり
+//   ・欲しい練習に誰もいない週はハズレ
+//   ・人数が多いほど全員がよく伸びる（gatherBonus）
+// だから毎週の顔ぶれが判断材料になり、指示を8人ぶん出す必要がなくなる。
+//
 // effects は「基礎パラメータ」を対象にする。試合能力は直接は狙えない。
-//   シュート力を上げたければ、テクニックとIQを伸ばすしかない。
-// load は疲労の溜まりやすさ。
-//   毎週6は自然に回復するので、load 6未満のメニューは疲労が抜けていく。
-//
-// 設計の原則: 「伸び」と「負荷」は必ず釣り合わせる。
-//   よく伸びるのに疲れないメニューがあると、それを選び続けるだけになり、
-//   疲労管理という仕組みそのものが死ぬ。
-//   例外は戦術ミーティングだけ。伸びが小さい代わりに、休みながら進める。
-//
-// 対象パラメータも重ねない。1メニュー = 1つの主目的。
-//   技術練習とミーティングが両方テクニックとIQを伸ばしていたのでは、
-//   どちらを選ぶかが「疲れない方」の一択になってしまう。
+// load は疲労の溜まりやすさ。毎週6は自然に回復する。
+// 数字が旧仕様より大きいのは、伸びる人数が減ったから。
+// 旧仕様は8人全員が毎週フルで練習していた。今は名前が出た平均2.4人だけ。
+// 同じ数字のままだと1年でOVR 58までしか行かず、12月に帝王と戦えない。
 const MENUS = [
   {
-    name: "ウェイトトレーニング", key: "weight",
-    desc: "パワー中心。当たり負けしない体を作る。",
-    effects: { power: 2.2, stamina: 0.4 },
+    key: "physical", name: "フィジカル", icon: "🏋",
+    desc: "当たり負けしない体と、跳ぶ力を作る。",
+    effects: { power: 2.9, jump: 2.1 },
     load: 16,
   },
   {
-    name: "アジリティ", key: "agility",
-    desc: "スピード中心。切り返しと初速。",
-    effects: { speed: 2.2, stamina: 0.5 },
-    load: 14,
-  },
-  {
-    name: "走り込み", key: "run",
-    desc: "地味だが効く。スタミナ全振り。",
-    effects: { stamina: 2.5, speed: 0.4 },
+    key: "running", name: "ランニング", icon: "🏃",
+    desc: "走り込み。地味だが、40分走り切る体になる。",
+    effects: { stamina: 3.2, speed: 1.5 },
     load: 18,
   },
   {
-    name: "ジャンプ強化", key: "jump",
-    desc: "跳躍力。リバウンド争いの土台。膝に来る。",
-    effects: { jump: 2.2, power: 0.6 },
+    key: "agility", name: "アジリティ", icon: "⚡",
+    desc: "初速と切り返し。抜く力と、追う力。",
+    effects: { speed: 3.2, jump: 1.2 },
     load: 15,
   },
   {
-    name: "技術練習", key: "tech",
+    key: "shooting", name: "シュート", icon: "🎯",
     desc: "ハンドリングとシューティング。反復あるのみ。",
-    effects: { tech: 2.2 },
-    load: 12,
+    effects: { tech: 3.2, iq: 0.8 },
+    load: 11,
   },
   {
-    name: "戦術ミーティング", key: "meeting",
-    desc: "座学。伸びは小さいが、休みながら賢くなれる。",
-    effects: { iq: 1.4 },
-    load: 2,
+    // load 9 は「疲労が+3ずつ溜まる」ということ。
+    // 4にしていたときは自然回復(6)を下回り、疲労が減りながら伸びた。
+    // IQは全部の試合能力に効くので、それを無限に回せると
+    // 「戦術だけ選び続ける」が最適解になり、他の4つが死ぬ。
+    key: "tactics", name: "戦術", icon: "🧠",
+    desc: "映像と読み合わせ。座学だが、頭も疲れる。",
+    effects: { iq: 2.4, tech: 0.8 },
+    load: 9,
   },
   {
-    name: "実戦形式", key: "scrimmage",
-    desc: "紅白戦。全部が少しずつ伸びるが、いちばん疲れる。",
-    effects: { power: 0.4, speed: 0.6, stamina: 0.7, jump: 0.4, tech: 0.8, iq: 0.9 },
-    load: 20,
-  },
-  {
-    name: "休養", key: "rest",
+    key: "rest", name: "休憩", icon: "😴",
     desc: "休ませる。伸びないが、疲労が大きく抜ける。",
     effects: {},
     load: 0,
-    rest: 30, // 追加で回復する量
-  },
-
-  // --- ここから下は上位練習 ---
-  // 同じ練習を積み重ねると解禁される。
-  //
-  // 注意して読むべき点: 上位練習は「疲労あたりの伸び」ではむしろ基本練習に劣る。
-  //   ウェイト   伸び2.6 / 疲労10 = 0.26
-  //   加重ウェイト 伸び3.9 / 疲労18 = 0.22
-  // それでも価値があるのは、シーズンが36週しかないからだ。
-  // 疲労は休めば戻るが、週は戻らない。「1週あたりの伸び」を買うために、
-  // 効率の悪さを承知で踏み込む——それが上位練習。
-  // だから「解禁したから全部これにする」は成立しない。ケガ人が出る。
-  {
-    name: "加重ウェイト", key: "weight2", upgradeOf: "weight", locked: true,
-    desc: "限界まで挙げる。パワーの伸びが跳ね上がる。",
-    effects: { power: 3.4, stamina: 0.5 },
-    load: 24,
-  },
-  {
-    name: "SAQトレーニング", key: "agility2", upgradeOf: "agility", locked: true,
-    desc: "加速・減速・方向転換を分解して鍛える。",
-    effects: { speed: 3.4, stamina: 0.6 },
-    load: 21,
-  },
-  {
-    name: "インターバル走", key: "run2", upgradeOf: "run", locked: true,
-    desc: "全力と小休止の繰り返し。心臓が悲鳴を上げる。",
-    effects: { stamina: 3.6, speed: 0.8 },
-    load: 26,
-  },
-  {
-    name: "プライオメトリクス", key: "jump2", upgradeOf: "jump", locked: true,
-    desc: "爆発的な跳躍。効果は絶大、膝への負担も絶大。",
-    effects: { jump: 3.4, power: 0.8 },
-    load: 23,
-  },
-  {
-    name: "個別技術指導", key: "tech2", upgradeOf: "tech", locked: true,
-    desc: "一人ひとりの癖を矯正する。地味だが確実。",
-    effects: { tech: 3.4 },
-    load: 18,
-  },
-  {
-    name: "映像分析", key: "meeting2", upgradeOf: "meeting", locked: true,
-    desc: "相手と自分を映像で解剖する。休みながら伸びる、唯一の上位練習。",
-    effects: { iq: 2.4 },
-    load: 4,
-  },
-  {
-    name: "紅白戦（強度高）", key: "scrimmage2", upgradeOf: "scrimmage", locked: true,
-    desc: "本番同様の強度。全部が伸びるが、ケガと隣り合わせ。",
-    effects: { power: 0.6, speed: 0.9, stamina: 1.0, jump: 0.6, tech: 1.2, iq: 1.3 },
-    load: 28,
+    rest: 30,
+    always: true, // 休憩には誰の名前も出ない。いつでも選べる。
   },
 ];
 
-// 上位練習が解禁されるのに必要な熟練度。
-// 全員で1週やると +1.0 なので、6 は「全員で6週ぶん」。
-//
-// 10にしていたときは、3種類に絞っても1つしか解禁できなかった。
-// 36週のうち、大会で3週・行事で4週が消え、疲労を抜くための休養も要る。
-// 実際に練習できるのは20週ほどしかない。10は机上の数字だった。
-// 6なら、2種類で2つ、3種類で3つ。散らせば0のまま。
-const MASTERY_NEEDED = 6;
-
-// メニューを key から引く
 function getMenu(key) {
   return MENUS.find(m => m.key === key);
 }
 
-// その練習が今使えるか
-function isMenuAvailable(menu) {
-  if (!menu.locked) return true;
-  return (state.mastery[menu.upgradeOf] ?? 0) >= MASTERY_NEEDED;
+// 練習として選べるもの（休憩を除く5つ）
+function trainingMenus() {
+  return MENUS.filter(m => !m.always);
 }
 
-// 上位練習が存在するメニューについて、その上位版を返す
-function getUpgrade(menu) {
-  return MENUS.find(m => m.upgradeOf === menu.key);
+
+// ---- 5.1 練習レベル ----------------------------------
+//
+// 同じ練習を5回選ぶとレベルが上がる。最大3。
+// 「あれこれ手を出すより、1つを続けたほうが伸びる」を作るための仕組み。
+// ただしレベルを上げるには5週かかるので、36週で全部を3にはできない。
+const LEVEL_UP_EVERY = 5;
+const MAX_LEVEL = 3;
+
+// レベルごとの伸びの倍率
+const LEVEL_MULT = { 1: 1.0, 2: 1.25, 3: 1.5 };
+
+function menuLevel(key) {
+  const count = state.menuCount[key] ?? 0;
+  return Math.min(MAX_LEVEL, 1 + Math.floor(count / LEVEL_UP_EVERY));
+}
+
+// 次のレベルまであと何回か（最大なら null）
+function toNextLevel(key) {
+  const level = menuLevel(key);
+  if (level >= MAX_LEVEL) return null;
+  const count = state.menuCount[key] ?? 0;
+  return LEVEL_UP_EVERY - (count % LEVEL_UP_EVERY);
+}
+
+
+// ---- 5.2 誰がどの練習に出るか -------------------------
+//
+// affinity は「その練習に名前が出やすいか」。1.0が普通。
+// 選手の性格と噛み合わせてある。
+//   緑川は走らない（ランニング0.3）。白石は跳ぶ（フィジカル1.8）。
+//   紫藤は戦術に必ず顔を出すが、フィジカルにはまず出ない。
+// これがあるから「今週フィジカルに白石と緑川が並んだ」に意味が出る。
+const AFFINITY = {
+  "赤星 蓮":   { physical: 0.6, running: 1.1, agility: 1.5, shooting: 1.4, tactics: 1.6 },
+  "紫藤 圭":   { physical: 0.4, running: 0.9, agility: 1.0, shooting: 1.3, tactics: 1.9 },
+  "青木 樹":   { physical: 0.7, running: 0.7, agility: 1.0, shooting: 2.0, tactics: 1.0 },
+  "桃井 隼":   { physical: 0.9, running: 2.0, agility: 1.5, shooting: 0.8, tactics: 0.5 },
+  "黒田 迅":   { physical: 1.3, running: 1.2, agility: 1.2, shooting: 1.1, tactics: 1.2 },
+  "灰谷 悠":   { physical: 1.0, running: 1.0, agility: 1.0, shooting: 1.0, tactics: 1.1 },
+  "鷲尾 陣":   { physical: 1.6, running: 1.1, agility: 1.4, shooting: 0.9, tactics: 0.7 },
+  "白石 大河": { physical: 1.8, running: 1.0, agility: 0.9, shooting: 0.6, tactics: 0.3 },
+  "緑川 壮真": { physical: 1.7, running: 0.3, agility: 0.4, shooting: 0.8, tactics: 1.5 },
+};
+
+// 1つの練習に名前が出る基本確率。
+// 5つの練習それぞれで抽選するので、1人あたり平均 5 × 0.26 ≈ 1.3ヶ所に出る。
+const APPEAR_BASE = 0.26;
+
+// 主人公の名前
+const HERO_NAME = "赤星 蓮";
+
+function appearChance(player, menuKey) {
+  const affinity = AFFINITY[player.name]?.[menuKey] ?? 1.0;
+  return Math.max(0.04, Math.min(0.62, APPEAR_BASE * affinity));
+}
+
+// 今週の顔ぶれを抽選する。{ 練習key: [選手名] }
+//
+// 週を進めるたびに引き直す。前の週の並びが残っていると、
+// 「今週は誰が出ているか」を見る意味がなくなる。
+function rollRoster() {
+  const roster = {};
+  for (const menu of trainingMenus()) roster[menu.key] = [];
+
+  const available = players.filter(p => p.injuryWeeks === 0);
+
+  for (const player of available) {
+    for (const menu of trainingMenus()) {
+      if (Math.random() < appearChance(player, menu.key)) {
+        roster[menu.key].push(player.name);
+      }
+    }
+  }
+
+  // 赤星は主人公なので、必ず2ヶ所以上に出る。
+  // 出ない週があると「今週は赤星が育てられない」で話が止まってしまう。
+  const hero = players.find(p => p.name === HERO_NAME && p.injuryWeeks === 0);
+  if (hero) {
+    const where = () => trainingMenus().filter(m => roster[m.key].includes(hero.name));
+    // 出やすい練習から順に足していく
+    const order = trainingMenus()
+      .slice()
+      .sort((a, b) => appearChance(hero, b.key) - appearChance(hero, a.key));
+
+    for (const menu of order) {
+      if (where().length >= 2) break;
+      if (!roster[menu.key].includes(hero.name)) roster[menu.key].push(hero.name);
+    }
+  }
+
+  return roster;
+}
+
+// 人数が多いほど、その練習に出ている全員がよく伸びる。
+// 1人でやるより、5人で競り合ったほうが練習になる、という話。
+function gatherBonus(count) {
+  if (count <= 0) return 1;
+  return 1 + (count - 1) * 0.10; // 5人なら1.4倍
 }
 
 
@@ -336,21 +364,17 @@ function getUpgrade(menu) {
 // カレンダーの表示（9ヶ月ぶん）とこの数字は必ず一致させること。
 const TOTAL_WEEKS = 36;
 
-const DEFAULT_MENU = MENUS.findIndex(m => m.key === "scrimmage");
-
 const state = {
   week: 0,   // 経過週数（0 = 4月1週目）
   log: [],
-  // 誰にどのメニューをやらせるか。{ 選手名: MENUSの番号 }
-  // 最初は全員「実戦形式」にしておく。
-  assign: Object.fromEntries(players.map(p => [p.name, DEFAULT_MENU])),
+  // 今週、どの練習に誰の名前が出ているか { 練習key: [選手名] }
+  // 週を進めるたびに引き直す。
+  roster: {},
+  // その練習を何回選んだか { 練習key: 回数 }。5回ごとにレベルが上がる。
+  menuCount: {},
   buff: null,      // 練習効率のバフ { mult, weeks, text }。なければ null
   unlocked: [],    // イベントで習得した特殊戦術のキー
   tournaments: {}, // 大会の結果 { kengun: "won" | "lost" | "skipped" }
-  // 練習の熟練度 { メニューkey: 積み重ね }。
-  // 全員で1週やると +1.0。半分の人数なら +0.5。
-  // MASTERY_NEEDED に達すると上位練習が解禁される。
-  mastery: {},
   history: [],     // 戦歴（試合の記録）
   storySeen: [],   // 既に流したメインストーリーの週
   choicesMade: {}, // 選択式イベントで選んだもの { key: 選んだ選択肢のkey }
@@ -554,7 +578,8 @@ function trainPlayer(player, menu, mods = {}) {
 
   return {
     player, menu,
-    status: menu.rest ? "rest" : "trained",
+    // sideline = 名前が出ていなくて、脇で軽く動いていただけ
+    status: menu.rest ? "rest" : mods.attending === false ? "sideline" : "trained",
     efficiency,
     gains, derivedGains,
   };
@@ -576,21 +601,49 @@ function getWeekMods() {
   };
 }
 
-// 全員が「それぞれに指示されたメニュー」を1週間おこなう。
-function doWeek() {
+// 名前が出ていない選手が、その週にやること。
+// 完全に何もしないわけではない。脇で自主練はしている。
+// 伸びは3分の1ほど。ここを0にすると、名前が出ない選手が
+// 1年間まったく育たず、控えとの差が開きすぎる。
+const SIDELINE_MULT = 0.35;
+
+// 選んだ練習を、部全体で1週間おこなう。
+//
+// 名前が出ている選手 … その練習を本気でやる（人数ボーナス＋レベル倍率つき）
+// 出ていない選手     … 脇で軽く動くだけ（微増）
+function doWeek(menuKey) {
   const mods = getWeekMods();
+  const menu = getMenu(menuKey);
+  const attending = state.roster[menuKey] ?? [];
+
+  // 人数ボーナスとレベル倍率。参加者全員に等しくかかる。
+  const bonus = menu.always ? 1 : gatherBonus(attending.length);
+  const level = menu.always ? 1 : LEVEL_MULT[menuLevel(menuKey)];
+
   const results = players.map(player => {
-    const menu = MENUS[state.assign[player.name]];
-    return trainPlayer(player, menu, mods);
+    // 休憩は全員が対象。それ以外は名前が出ている選手だけ。
+    const joined = menu.always || attending.includes(player.name);
+
+    if (joined) {
+      return trainPlayer(player, menu, {
+        ...mods,
+        growth: mods.growth * bonus * level,
+        attending: true,
+      });
+    }
+
+    return trainPlayer(player, menu, {
+      ...mods,
+      growth: mods.growth * SIDELINE_MULT,
+      fatigue: (mods.fatigue ?? 1) * SIDELINE_MULT,
+      attending: false,
+    });
   });
 
-  // 練習の熟練度を積む。行事で練習が流れた週は積まない。
-  if (!mods.forced) {
-    for (const result of results) {
-      if (result.status !== "trained") continue; // 休養・故障中は熟練にならない
-      const key = result.menu.key;
-      state.mastery[key] = (state.mastery[key] ?? 0) + 1 / players.length;
-    }
+  // 選んだ回数を数える。5回でレベルが上がる。
+  // 行事で流れた週と休憩は数えない。
+  if (!mods.forced && !menu.always) {
+    state.menuCount[menuKey] = (state.menuCount[menuKey] ?? 0) + 1;
   }
 
   return results;
@@ -635,6 +688,23 @@ function addLog(results, schoolEvent) {
 
 // ---- 10. 画面の描画 ----------------------------------
 
+// その選手が今週どの練習に名前を出しているか。
+// 部員カードからも見えたほうが、練習盤と行き来せずに済む。
+function appearsIn(player) {
+  if (player.injuryWeeks > 0) {
+    return `<div class="appears out">故障のため離脱中</div>`;
+  }
+  const where = trainingMenus().filter(m => (state.roster[m.key] ?? []).includes(player.name));
+  if (!where.length) {
+    return `<div class="appears none">今週はどこにも出ていない</div>`;
+  }
+  return `
+    <div class="appears">
+      <span class="appears-label">今週</span>
+      ${where.map(m => `<span class="appears-tag" title="${m.name}">${m.icon} ${m.name}</span>`).join("")}
+    </div>`;
+}
+
 // 直前の練習で上がった項目を覚えておき、緑色で表示するために使う
 let lastGained = {};
 // 直前に起きた特殊イベント（画面上部に大きく出す）
@@ -654,8 +724,6 @@ function renderRoster() {
 
   for (const player of players) {
     const derived = calcAllDerived(player);
-    // いま指示しているメニューが、どの基礎パラメータを狙っているか
-    const assignedMenu = MENUS[state.assign[player.name]];
     const condition = getCondition(player);
     const injured = player.injuryWeeks > 0;
 
@@ -669,10 +737,8 @@ function renderRoster() {
       const rate = player.growth[s.key];
       // 成長率が高い項目に印をつける。育成方針を決める手がかりになる。
       const mark = rate >= 1.3 ? "◎" : rate >= 1.1 ? "○" : rate <= 0.8 ? "▲" : "";
-      // 今週の練習で伸びる項目に印をつける（選ぶ前に効果が分かるように）
-      const targeted = assignedMenu.effects[s.key] ? "targeted" : "";
       return `
-        <div class="stat ${targeted}" title="成長率 ${rate.toFixed(1)} — ${s.desc}">
+        <div class="stat" title="成長率 ${rate.toFixed(1)} — ${s.desc}">
           <span class="stat-name">${s.label}<span class="growth-mark">${mark}</span></span>
           <div class="stat-track">
             <div class="stat-fill" style="width:${value}%"></div>
@@ -693,14 +759,6 @@ function renderRoster() {
           </div>
           <span class="stat-value ${gained ? "gained" : ""}">${value}</span>
         </div>`;
-    }).join("");
-
-    // この選手の練習メニューを選ぶドロップダウン。
-    // まだ解禁していない上位練習は出さない。
-    const options = MENUS.map((m, i) => {
-      if (!isMenuAvailable(m)) return "";
-      const selected = state.assign[player.name] === i ? "selected" : "";
-      return `<option value="${i}" ${selected}>${m.locked ? "▲ " : ""}${m.name}</option>`;
     }).join("");
 
     // コンディション欄。疲労バーと、今週の見込みを出す。
@@ -751,23 +809,10 @@ function renderRoster() {
       ${baseRows}
       <div class="section-label">試合能力<span class="section-note">基礎から自動計算</span></div>
       ${derivedRows}
-      <div class="assign">
-        <span class="assign-label">今週</span>
-        <select class="assign-select" data-player="${player.name}" ${injured ? "disabled" : ""}>
-          ${injured ? `<option>故障のため離脱中</option>` : options}
-        </select>
-      </div>`;
+      ${appearsIn(player)}`;
 
     box.appendChild(card);
   }
-
-  // ドロップダウンが変更されたら、指示を覚えておく
-  box.querySelectorAll(".assign-select").forEach(select => {
-    select.addEventListener("change", e => {
-      state.assign[e.target.dataset.player] = Number(e.target.value);
-      renderRoster(); // 効果プレビューを更新するために描き直す
-    });
-  });
 
   // 名前を押したら、マネージャーの手帳を開く
   box.querySelectorAll("[data-profile]").forEach(btn => {
@@ -777,58 +822,79 @@ function renderRoster() {
 
 // メニュー表。押すものではなく、何が伸びるかを確認するための一覧。
 // 上位練習は、解禁前も「あと何回で解禁か」を見せる。目標になるので。
+// 練習盤。このゲームでいちばん見る場所。
+//
+// 5つの練習に、今週の顔ぶれが並ぶ。押せばその練習で1週が進む。
+// 8人ぶんの指示を出す代わりに、ここでの1タップだけで週が終わる。
 function renderMenus() {
   const box = document.getElementById("menu-list");
 
-  // 基本の練習だけを並べ、その下に上位版をぶら下げる
-  const baseMenus = MENUS.filter(m => !m.locked);
+  const finished = state.week >= TOTAL_WEEKS;
+  const tournament = getTournament(state.week);
+  const event = getSchoolEvent(state.week);
+  const blocked = finished || tournament || event?.forced;
 
-  box.innerHTML = baseMenus.map(menu => {
-    const upgrade = getUpgrade(menu);
-    const mastery = state.mastery[menu.key] ?? 0;
-    const unlocked = upgrade && isMenuAvailable(upgrade);
+  box.innerHTML = MENUS.map(menu => {
+    const attending = menu.always
+      ? players.filter(p => p.injuryWeeks === 0).map(p => p.name)
+      : (state.roster[menu.key] ?? []);
 
-    // 上位練習の枠。解禁済みなら中身を、まだなら熟練度のバーを出す。
-    const upgradeBox = !upgrade ? "" : unlocked
-      ? `<div class="upgrade unlocked">
-           <div class="menu-title">
-             ▲ ${upgrade.name}
-             ${menuCount(upgrade) > 0 ? `<span class="menu-count">${menuCount(upgrade)}人</span>` : ""}
-             <span class="menu-load ${netLoad(upgrade) > 0 ? "" : "recover"}">${loadText(upgrade)}</span>
-           </div>
-           <div class="menu-desc">${upgrade.desc}</div>
-         </div>`
-      : `<div class="upgrade">
-           <div class="upgrade-head">
-             🔒 ${upgrade.name}
-             <span class="upgrade-need">熟練度 ${mastery.toFixed(1)} / ${MASTERY_NEEDED}</span>
-           </div>
-           <div class="stat-track">
-             <div class="stat-fill" style="width:${Math.min(100, mastery / MASTERY_NEEDED * 100)}%"></div>
-           </div>
-         </div>`;
+    const level = menu.always ? 1 : menuLevel(menu.key);
+    const next = menu.always ? null : toNextLevel(menu.key);
+
+    // 誰が出ているか。ここを見て選ぶので、顔と名前を両方出す。
+    const faces = attending.map(name => {
+      const player = getPlayer(name);
+      if (!player) return "";
+      return `
+        <span class="face" title="${name}">
+          ${portraitByName(name, "small", name)}
+          <span class="face-name">${name.split(" ")[0]}</span>
+        </span>`;
+    }).join("");
+
+    const bonus = menu.always ? 1 : gatherBonus(attending.length);
+    const mult = menu.always ? 1 : LEVEL_MULT[level] * bonus;
 
     return `
-      <div class="menu-item ${menuCount(menu) > 0 ? "active" : ""}">
-        <div class="menu-title">
-          ${menu.name}
-          ${menuCount(menu) > 0 ? `<span class="menu-count">${menuCount(menu)}人</span>` : ""}
-          <span class="menu-load ${netLoad(menu) > 0 ? "" : "recover"}"
-                title="1週あたりの疲労の増減。スタミナが高い選手ほど実際は軽くなる。">${loadText(menu)}</span>
+      <button class="train-card ${menu.key === "rest" ? "rest" : ""}
+                     ${attending.length === 0 && !menu.always ? "empty" : ""}"
+              data-train="${menu.key}" ${blocked ? "disabled" : ""}>
+        <div class="train-head">
+          <span class="train-icon">${menu.icon}</span>
+          <span class="train-name">${menu.name}</span>
+          ${menu.always ? "" : `<span class="train-lv lv${level}">Lv.${level}</span>`}
+          <span class="menu-load ${netLoad(menu) > 0 ? "" : "recover"}">${loadText(menu)}</span>
         </div>
-        <div class="menu-desc">${menu.desc}</div>
-        <div class="tags">${menuTags(menu)}</div>
-        ${upgradeBox}
-      </div>`;
+
+        <div class="train-tags">${menuTags(menu)}</div>
+
+        <div class="train-faces">
+          ${faces || (menu.always
+            ? ""
+            : `<span class="train-none">今週は誰も来ていない</span>`)}
+        </div>
+
+        <div class="train-foot">
+          ${menu.always
+            ? `<span class="train-effect">全員が休む</span>`
+            : `<span class="train-count ${attending.length >= 3 ? "many" : ""}">
+                 ${attending.length}人
+               </span>
+               <span class="train-effect">
+                 ${attending.length ? `伸び ×${mult.toFixed(2)}` : "—"}
+               </span>`}
+          ${next ? `<span class="train-next">あと${next}回でLv.${level + 1}</span>` : ""}
+        </div>
+      </button>`;
   }).join("");
+
+  box.querySelectorAll("[data-train]").forEach(btn => {
+    btn.addEventListener("click", () => onNextWeek(btn.dataset.train));
+  });
 }
 
 // メニュー表示のための小道具
-function menuCount(menu) {
-  return players.filter(p =>
-    p.injuryWeeks === 0 && MENUS[state.assign[p.name]] === menu).length;
-}
-
 function netLoad(menu) {
   return menu.load - NATURAL_RECOVERY - (menu.rest || 0);
 }
@@ -846,15 +912,6 @@ function menuTags(menu) {
       return `<span class="tag ${v >= 1.5 ? "tag-main" : ""}">${label}</span>`;
     })
     .join("");
-}
-
-// 「全員に同じメニュー」のドロップダウン
-function renderBulk() {
-  const select = document.getElementById("bulk-select");
-  select.innerHTML =
-    `<option value="">— 選ぶ —</option>` +
-    MENUS.map((m, i) => isMenuAvailable(m)
-      ? `<option value="${i}">${m.locked ? "▲ " : ""}${m.name}</option>` : "").join("");
 }
 
 function renderNextButton() {
@@ -993,7 +1050,6 @@ function renderAll() {
   renderEventBanner();
   renderRoster();
   renderMenus();
-  renderBulk();  // 上位練習が解禁されたら選べるようにする
   renderNextButton();
   renderLog();
   renderManagerComment(); // profile.js
@@ -1048,7 +1104,9 @@ function answerChoice(choice, option) {
 
 
 // 「1週間 練習する」を押したとき。この関数が1週間の流れそのもの。
-function onNextWeek() {
+// 練習を1つ選んで、1週間を進める。
+// menuKey を省いたとき（大会週・行事週など）は練習なしで週だけ進む。
+function onNextWeek(menuKey) {
   if (state.week >= TOTAL_WEEKS) return;
 
   // 選ぶべきことがあるなら、先に選んでもらう。
@@ -1084,6 +1142,7 @@ function onNextWeek() {
     lastEvent = null;
     tickBuff();
     state.week++;
+    state.roster = rollRoster();
     renderAll();
     return;
   }
@@ -1093,7 +1152,10 @@ function onNextWeek() {
   lastStory = runStory();
 
   const mods = getWeekMods();
-  const results = doWeek();
+  // 行事で部活が止まる週は、何を選んでいても練習にならない。
+  // その場合は休憩扱いにして、trainPlayer 側の forced 処理に任せる。
+  const chosen = mods.forced ? "rest" : (menuKey ?? "rest");
+  const results = doWeek(chosen);
 
   // 「今回どこが上がったか」を選手名ごとにまとめて覚えておく（緑表示用）
   lastGained = {};
@@ -1119,24 +1181,17 @@ function onNextWeek() {
 
   tickBuff(); // バフの残り週数を減らす
   state.week++;
+
+  // 次の週の顔ぶれを引く。
+  // ここで引かないと、先週と同じ並びのまま次の週が始まってしまう。
+  state.roster = rollRoster();
+
   renderAll();
   saveGame(true); // 週が変わるたびに自動セーブ
 
   // 話があれば、最後に前面へ出す
   showStoryModal();
 }
-
-// 「全員に同じメニュー」が選ばれたとき
-function onBulkChange(e) {
-  if (e.target.value === "") return;
-  const index = Number(e.target.value);
-  for (const player of players) {
-    state.assign[player.name] = index;
-  }
-  e.target.value = ""; // 選びっぱなしにせず戻す
-  renderAll();
-}
-
 
 // ---- 11.5 セーブとロード ------------------------------
 //
@@ -1192,6 +1247,9 @@ function loadGame() {
   Object.assign(state, data.state);
 
   sortRoster();
+  // 古い仕様のセーブには顔ぶれが入っていない。その場で引き直す。
+  if (!state.roster || !Object.keys(state.roster).length) state.roster = rollRoster();
+  if (!state.menuCount) state.menuCount = {};
   matchState.lineup = [];   // 古い選手への参照を捨てる
   matchState.tournament = null;
   lastEvent = null;
@@ -1274,11 +1332,9 @@ function fromDrawer(fn) {
 // DOMContentLoaded は、末尾に並べた script が全部終わってから発火する。
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("next-week").addEventListener("click", onNextWeek);
-  document.getElementById("bulk-select").addEventListener("change", onBulkChange);
   document.getElementById("open-match").addEventListener("click", () => openMatch());
   document.getElementById("open-history").addEventListener("click", () => openHistory());
   document.getElementById("open-notebook").addEventListener("click", () => openNotebook());
-  document.getElementById("open-orders").addEventListener("click", () => openOrders());
   document.getElementById("save-btn").addEventListener("click", () => saveGame());
   document.getElementById("load-btn").addEventListener("click", () => loadGame());
   document.getElementById("reset-btn").addEventListener("click", () => resetGame());
@@ -1291,7 +1347,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.target.id === "menu-drawer") closeDrawer();
   });
 
-  document.getElementById("menu-orders").addEventListener("click", fromDrawer(openOrders));
   document.getElementById("menu-week").addEventListener("click", fromDrawer(onNextWeek));
   document.getElementById("menu-match").addEventListener("click", fromDrawer(openMatch));
   document.getElementById("menu-notebook").addEventListener("click", fromDrawer(openNotebook));
@@ -1303,8 +1358,8 @@ document.addEventListener("DOMContentLoaded", () => {
   if (readSave()) {
     loadGame();
   } else {
+    state.roster = rollRoster(); // 初週の顔ぶれ
     lastStory = runStory();
-    renderBulk();
     renderAll();
     renderSaveInfo();
     showStoryModal(); // 第1話を読ませてから始める
