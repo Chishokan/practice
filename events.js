@@ -1257,7 +1257,15 @@ function runStory() {
 
   if (variant.effect) variant.effect();
 
-  return { title: variant.title, text, cast: cast.filter(Boolean) };
+  const result = { title: variant.title, text, cast: cast.filter(Boolean) };
+
+  // 履歴から読み返せるように、出た版をそのまま残す。
+  // 分岐は条件で決まるので、後から text() を呼び直しても
+  // そのとき読んだ話が再現できるとは限らない。
+  if (!state.storyRead) state.storyRead = {};
+  state.storyRead[story.week] = result;
+
+  return result;
 }
 
 // バフの残り週数を減らす

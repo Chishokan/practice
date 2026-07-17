@@ -2531,3 +2531,205 @@ button, select { -webkit-tap-highlight-color: transparent; }
   .cal-cell { height: 22px; font-size: 8px; }
   .header h1 { font-size: 15px; }
 }
+
+
+/* ============================================
+   イベント履歴
+   見ていない話は伏せる。全部隠すと「まだ何かある」ことに
+   気づけないので、タイトルとレア度だけは見せる。
+   ============================================ */
+
+.gal-summary {
+  background: #171b24;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  text-align: center;
+}
+
+.gal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.gal-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #232936;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.gal-row:hover:not(:disabled) { border-color: var(--accent); }
+
+.gal-row.locked, .gal-step.locked {
+  color: #4e5866;
+  cursor: default;
+  opacity: 0.55;
+}
+
+.gal-when { color: var(--muted); font-size: 10px; min-width: 30px; }
+.gal-title { flex: 1; font-weight: bold; }
+.gal-mark { color: var(--muted); font-size: 10px; }
+
+/* 部員の話 */
+.gal-sub {
+  background: #232936;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  padding: 10px;
+}
+
+.gal-sub.unknown { opacity: 0.6; }
+
+.gal-sub-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.gal-stars { font-size: 11px; letter-spacing: -1px; }
+.gal-stars.rarity1 { color: var(--muted); }
+.gal-stars.rarity2 { color: #7bb0ff; }
+.gal-stars.rarity3 { color: #ffd166; }
+
+.gal-prog { color: var(--muted); font-size: 10px; margin-left: auto; }
+.gal-prog.done { color: #6ee787; font-weight: bold; }
+
+.gal-cast { color: var(--muted); font-size: 10px; margin-bottom: 6px; }
+
+.gal-steps { display: flex; flex-wrap: wrap; gap: 4px; }
+
+.gal-step {
+  flex: 1;
+  min-width: 90px;
+  background: #171b24;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 10px;
+  padding: 6px;
+}
+
+.gal-step:hover:not(:disabled) { border-color: var(--accent); }
+
+/* 読み返し */
+.gal-read {
+  background: #171b24;
+  border: 1px solid var(--accent-dim);
+  border-radius: 8px;
+  margin-top: 14px;
+  padding: 14px;
+}
+
+.gal-read.hidden { display: none; }
+
+
+/* ============================================
+   クリア後の画面
+   ============================================ */
+
+.train-blocked.cleared { text-align: left; padding: 0; background: none; }
+
+.clear-head {
+  background: linear-gradient(135deg, #1a1f2b, #12151c);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-bottom: 10px;
+  padding: 20px;
+  text-align: center;
+}
+
+/* 優勝したときだけ、金色にする */
+.clear-head.champion {
+  background: linear-gradient(135deg, #7a3a14, #b8721f);
+  border-color: var(--accent);
+}
+
+.clear-lead {
+  color: var(--accent);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+}
+
+.clear-head.champion .clear-lead { color: #ffe0b0; }
+
+.clear-title {
+  color: #fff;
+  font-size: 32px;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+}
+
+.clear-cups {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.clear-cup {
+  background: #171b24;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 11px;
+  padding: 10px;
+  text-align: center;
+}
+
+.clear-cup span { display: block; color: var(--muted); font-size: 10px; }
+.clear-cup b { font-size: 14px; }
+.clear-cup.won { background: #16341f; border-color: #3f9e60; }
+.clear-cup.won b { color: #6ee787; }
+.clear-cup.lost { background: #35191c; border-color: #a03e3e; }
+.clear-cup.lost b { color: #ff6b6b; }
+
+.clear-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+  background: #171b24;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  padding: 12px;
+}
+
+.clear-stats span { display: block; color: var(--muted); font-size: 10px; }
+.clear-stats b { font-size: 15px; }
+.clear-stats > div { text-align: center; }
+
+.clear-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 6px;
+}
+
+.clear-actions .match-btn { margin-top: 0; }
+
+.clear-note {
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 12px;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .clear-title { font-size: 24px; }
+  .clear-cups { grid-template-columns: 1fr; }
+  .clear-actions { grid-template-columns: 1fr; }
+}

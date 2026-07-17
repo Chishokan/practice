@@ -405,6 +405,7 @@ const state = {
   tournaments: {}, // 大会の結果 { kengun: "won" | "lost" | "skipped" }
   history: [],     // 戦歴（試合の記録）
   storySeen: [],   // 既に流したメインストーリーの週
+  storyRead: {},   // 実際に読んだ本文 { 週: {title, text, cast} }。履歴で読み返す。
   choicesMade: {}, // 選択式イベントで選んだもの { key: 選んだ選択肢のkey }
   subs: {},        // サブイベントの進行 { key: 進んだ段数 }
   subLast: {},     // 各サブイベントが最後に進んだ週 { key: 週 }
@@ -954,6 +955,72 @@ function menuTags(menu) {
     .join("");
 }
 
+// シーズンが終わった後の画面。
+//
+// ウィンターカップ前と同じ顔のままだと、1年を走り切った実感がない。
+// ここでは「これから何をするか」ではなく「何をしたか」を出す。
+function renderCleared() {
+  const w = state.tournaments.winter;
+  const n = state.tournaments.national;
+  const k = state.tournaments.kengun;
+
+  // 到達点によって、掛ける言葉を変える
+  const champion = w === "won";
+  const double = champion && n === "won";
+  const record = countRecord();
+
+  const title = double ? "二冠"
+    : champion ? "日本一"
+    : w === "lost" ? "1年、終了"
+    : "1年、終了";
+
+  const lead = double ? "インターハイ・ウィンターカップ 制覇"
+    : champion ? "ウィンターカップ 優勝"
+    : "この1年で、部はここまで来た";
+
+  const top = players.slice().sort((a, b) => b.career.pts - a.career.pts)[0];
+  const heroPlayer = getPlayer(HERO_NAME);
+
+  const cups = [
+    ["🥈 県大会", k],
+    ["🔴 全国", n],
+    ["🏆 ウィンターカップ", w],
+  ].map(([name, r]) => {
+    const label = r === "won" ? "優勝" : r === "lost" ? "敗退"
+      : r === "skipped" ? "不出場" : "—";
+    const cls = r === "won" ? "won" : r === "lost" ? "lost" : "";
+    return `<div class="clear-cup ${cls}"><span>${name}</span><b>${label}</b></div>`;
+  }).join("");
+
+  return `
+    <div class="clear-head ${champion ? "champion" : ""}">
+      <div class="clear-lead">${lead}</div>
+      <div class="clear-title">${title}</div>
+    </div>
+
+    <div class="clear-cups">${cups}</div>
+
+    <div class="clear-stats">
+      <div><span>通算</span><b>${record.wins}勝 ${record.loses}敗</b></div>
+      <div><span>チーム平均</span><b>${Math.round(teamAvgOvr())}</b></div>
+      ${heroPlayer ? `<div><span>赤星の総合力</span><b>${calcOvr(heroPlayer)}</b></div>` : ""}
+      ${top && top.career.pts > 0
+        ? `<div><span>最多得点</span><b>${top.name} ${top.career.pts}</b></div>` : ""}
+    </div>
+
+    <div class="clear-actions">
+      <button class="next-btn" id="cleared-ending">🏆 結末をもう一度見る</button>
+      <button class="match-btn" id="cleared-history">📊 戦歴</button>
+      <button class="match-btn" id="cleared-gallery">📖 イベント履歴</button>
+      <button class="match-btn subtle" id="cleared-again">↺ もう1年やる</button>
+    </div>
+
+    <div class="clear-note">
+      赤星はまだ1年生。来年も、再来年もある。
+    </div>`;
+}
+
+
 // 練習盤の見出しと、練習できない週の案内。
 //
 // 「今週は何ができるのか」を、練習盤を見た瞬間に分かるようにする。
@@ -969,12 +1036,27 @@ function renderNextButton() {
 
   // 練習できない週は、練習盤そのものを「進む」ボタンに差し替える。
   // 押せないカードを並べても、何をすればいいのか分からない。
-  if (finished || tournament || forced) {
+  if (finished) {
+    // 1年が終わった後の画面。
+    // ここまで来た人には、練習盤ではなく結果を見せる。
+    hint.textContent = "";
+    board.className = "train-blocked cleared";
+    board.innerHTML = renderCleared();
+    document.getElementById("cleared-ending")
+      ?.addEventListener("click", () => openEnding());
+    document.getElementById("cleared-history")
+      ?.addEventListener("click", () => openHistory());
+    document.getElementById("cleared-gallery")
+      ?.addEventListener("click", () => openGallery());
+    document.getElementById("cleared-again")
+      ?.addEventListener("click", () => resetGame());
+    return;
+  }
+
+  if (tournament || forced) {
     hint.textContent = "";
     board.className = "train-blocked";
-    board.innerHTML = finished
-      ? `<div class="blocked-note">シーズン終了。おつかれさまでした。</div>`
-      : `<div class="blocked-note">
+    board.innerHTML = `<div class="blocked-note">
            ${tournament ? `${tournament.icon} 今週は${tournament.name}です。`
              : `${event.icon} 今週は${event.name}。部活動はありません。`}
          </div>
@@ -983,6 +1065,7 @@ function renderNextButton() {
              : tournament ? `▶ ${tournament.name}を見送って次の週へ`
              : `▶ ${event.name}の1週間を過ごす`}
          </button>`;
+
 
     const go = document.getElementById("blocked-go");
     if (go) go.addEventListener("click", () => onNextWeek());
@@ -1365,6 +1448,7 @@ function loadGame() {
   if (!state.menuCount) state.menuCount = {};
   if (!state.subs) state.subs = {};
   if (!state.subLast) state.subLast = {};
+  if (!state.storyRead) state.storyRead = {};
   matchState.lineup = [];   // 古い選手への参照を捨てる
   matchState.tournament = null;
   lastEvent = null;
@@ -1449,6 +1533,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.getElementById("menu-match").addEventListener("click", fromDrawer(openMatch));
+  document.getElementById("menu-gallery").addEventListener("click", fromDrawer(openGallery));
   document.getElementById("menu-notebook").addEventListener("click", fromDrawer(openNotebook));
   document.getElementById("menu-history").addEventListener("click", fromDrawer(openHistory));
   document.getElementById("menu-save").addEventListener("click", fromDrawer(() => saveGame()));
