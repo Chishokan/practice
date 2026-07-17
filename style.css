@@ -1930,7 +1930,15 @@ button, select { -webkit-tap-highlight-color: transparent; }
    ページ全体が横にずれるのがいちばん触りにくいので、それだけは避ける。 */
 
 @media (max-width: 640px) {
-  body { padding: 10px; }
+  /* iPhoneのノッチやホームバーに文字が隠れないようにする。
+     env(safe-area-inset-*) は、その端末で実際に避けるべき余白。 */
+  body {
+    padding: 10px;
+    padding-top: max(10px, env(safe-area-inset-top));
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+    padding-left: max(10px, env(safe-area-inset-left));
+    padding-right: max(10px, env(safe-area-inset-right));
+  }
 
   /* --- ヘッダー --- */
   .header {

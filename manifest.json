@@ -1,0 +1,19 @@
+{
+  "name": "ウィンターカップへの道",
+  "short_name": "WCへの道",
+  "description": "高校バスケ部のチーム育成シミュレーション",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#12151c",
+  "theme_color": "#ff7a2f",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "images/akaboshi.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
