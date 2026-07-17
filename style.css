@@ -56,40 +56,34 @@ button, select { -webkit-tap-highlight-color: transparent; }
   color: var(--muted);
 }
 
-/* セーブまわり */
-.save-box {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+/* メニューの入口。セーブもこの中に入っている。 */
+.burger {
   margin-left: auto;
-}
-
-.save-info {
-  color: var(--muted);
-  font-size: 10px;
-  margin-right: 4px;
-  transition: color 0.2s;
-}
-
-/* セーブした瞬間だけ光らせる */
-.save-info.flash { color: #6ee787; font-weight: bold; }
-
-.save-btn {
   background: #232936;
   border: 1px solid var(--line);
-  border-radius: 5px;
-  color: var(--muted);
+  border-radius: 8px;
+  color: var(--text);
   cursor: pointer;
   font-family: inherit;
-  font-size: 11px;
-  padding: 5px 9px;
+  font-size: 13px;
+  padding: 9px 14px;
+  white-space: nowrap;
 }
 
-.save-btn:hover { border-color: var(--accent); color: var(--text); }
+.burger:hover { border-color: var(--accent); color: var(--accent); }
 
-.save-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+/* メニューの中のセーブ状況 */
+.drawer-save {
+  color: var(--muted);
+  font-size: 11px;
+  padding: 0 4px 6px;
+}
 
-.save-btn.danger:hover { border-color: #a03e3e; color: #ff9f7a; }
+.save-info { transition: color 0.2s; }
+.save-info.flash { color: #6ee787; font-weight: bold; }
+
+.drawer-item.danger { color: #ff9f7a; }
+.drawer-item.danger:hover { border-color: #a03e3e; }
 
 /* ============================================
    年間カレンダー
@@ -235,6 +229,60 @@ button, select { -webkit-tap-highlight-color: transparent; }
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 10px;
+}
+
+/* ============================================
+   サブイベント（部員同士の話）
+   メインストーリーとは色を変える。誰の話なのか分かるように。
+   ============================================ */
+
+.sub-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #b0a0d8;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.sub-tag {
+  background: #2a2438;
+  border: 1px solid #4a3d6b;
+  border-radius: 4px;
+  color: #b0a0d8;
+  font-size: 10px;
+  padding: 1px 7px;
+}
+
+.sub-step {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.sub-gained {
+  background: #16341f;
+  border-radius: 6px;
+  color: #b7f5c6;
+  font-size: 12px;
+  margin-top: 12px;
+  padding: 8px 10px;
+}
+
+.sub-finished {
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 8px;
+  text-align: center;
+}
+
+/* ログの中のサブイベント */
+.log-sub {
+  background: #2a2438;
+  border-radius: 4px;
+  color: #b0a0d8;
+  margin: 3px 0;
+  padding: 3px 6px;
 }
 
 /* 選んだ結果は、ストーリーの上に少し違う色で出す */
@@ -2128,6 +2176,26 @@ button, select { -webkit-tap-highlight-color: transparent; }
 
 .appears.out { color: #ff6b6b; }
 
+/* 練習できない週。練習盤の代わりにここが出る。 */
+.train-blocked {
+  background: #171b24;
+  border-radius: 8px;
+  padding: 14px;
+  text-align: center;
+}
+
+.blocked-note {
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.train-blocked .next-btn { max-width: 420px; margin: 0 auto; }
+
+/* 今週の状況は練習盤の真上。選ぶ前に読ませる。 */
+.train-panel #upcoming:not(:empty) { margin-bottom: 10px; }
+.train-panel .event-banner:not(.hidden) { margin-bottom: 12px; }
+
 /* ============================================
    評価（F〜S）
    数字を読まなくても、色と字で強弱が分かるようにする
@@ -2159,18 +2227,6 @@ button, select { -webkit-tap-highlight-color: transparent; }
 /* ============================================
    バーガーメニュー
    ============================================ */
-
-.burger {
-  display: none; /* パソコンでは出さない。右のパネルに全部あるので。 */
-  background: #232936;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  color: var(--text);
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-  padding: 8px 12px;
-}
 
 .drawer {
   position: fixed;
@@ -2356,16 +2412,8 @@ button, select { -webkit-tap-highlight-color: transparent; }
   .header h1 { font-size: 17px; }
   #date-label { font-size: 17px; }
 
-  /* セーブ欄は横幅いっぱいに置き直す */
-  .save-box {
-    width: 100%;
-    margin-left: 0;
-    justify-content: flex-start;
-  }
-
-  .save-info { flex: 1; }
-
   /* --- 指が届く大きさにする --- */
+  .burger { padding: 11px 14px; font-size: 14px; }
   .next-btn { padding: 16px; font-size: 16px; }
   .match-btn { padding: 13px; }
   .assign-select, #bulk-select { padding: 9px 8px; font-size: 13px; }
@@ -2404,15 +2452,6 @@ button, select { -webkit-tap-highlight-color: transparent; }
 
   /* --- 部員カード --- */
   .roster { grid-template-columns: 1fr; }
-
-  /* --- バーガーメニュー --- */
-  .burger { display: block; }
-
-  /* 右のパネルはメニューから開けるので、スマホでは畳んでおく。
-     ただし消しはしない（メニュー表や特殊戦術の進捗は見たいので、下に残る） */
-  .layout > .panel:last-child .next-btn,
-  .layout > .panel:last-child .match-btn,
-  .layout > .panel:last-child .menu-tabs { display: none; }
 
   /* --- 練習指示 --- */
   /* 3列は狭すぎて潰れる。名前と評価を上、選択欄を下に敷く。 */
@@ -2491,5 +2530,4 @@ button, select { -webkit-tap-highlight-color: transparent; }
 @media (max-width: 380px) {
   .cal-cell { height: 22px; font-size: 8px; }
   .header h1 { font-size: 15px; }
-  .save-btn { font-size: 10px; padding: 5px 7px; }
 }

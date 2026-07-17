@@ -389,6 +389,8 @@ const state = {
   history: [],     // 戦歴（試合の記録）
   storySeen: [],   // 既に流したメインストーリーの週
   choicesMade: {}, // 選択式イベントで選んだもの { key: 選んだ選択肢のkey }
+  subs: {},        // サブイベントの進行 { key: 進んだ段数 }
+  subLast: {},     // 各サブイベントが最後に進んだ週 { key: 週 }
   quitter: null,   // 退部した部員（冬に効いてくる）
 };
 
@@ -477,9 +479,9 @@ function calcEfficiency(fatigue) {
 
 // 今週たまる疲労。スタミナが高いほど溜まりにくい。
 // スタミナ30なら1.15倍、スタミナ90なら0.85倍。
-function calcFatigueGain(player, menu) {
+function calcFatigueGain(player, load) {
   const staminaMult = 1.3 - player.base.stamina / 200;
-  return menu.load * staminaMult;
+  return load * staminaMult;
 }
 
 // 故障する確率。疲労60から危険域に入る。頑丈さで割り引く。
@@ -576,7 +578,9 @@ function trainPlayer(player, menu, mods = {}) {
   const broke = Math.random() < risk;
 
   // --- 疲労の増減 ---
-  const fatigueGain = calcFatigueGain(player, menu) * fatigueMult + (mods.extraFatigue ?? 0);
+  // mods.load があればそちらを使う（脇で自主練している選手のため）
+  const load = mods.load ?? menu.load;
+  const fatigueGain = calcFatigueGain(player, load) * fatigueMult + (mods.extraFatigue ?? 0);
   const recovery = NATURAL_RECOVERY + (menu.rest || 0) + (mods.recover ?? 0);
   player.fatigue = Math.max(0, Math.min(100, player.fatigue + fatigueGain - recovery));
 
@@ -614,9 +618,18 @@ function getWeekMods() {
 
 // 名前が出ていない選手が、その週にやること。
 // 完全に何もしないわけではない。脇で自主練はしている。
+//
 // 伸びは3分の1ほど。ここを0にすると、名前が出ない選手が
 // 1年間まったく育たず、控えとの差が開きすぎる。
 const SIDELINE_MULT = 0.35;
+
+// 自主練の負荷。選んだ練習が何であっても、脇の選手はこれだけ疲れる。
+//
+// 以前はここも「選んだ練習の負荷 × 0.35」にしていた。
+// すると自然回復(6)を下回り、脇にいるだけで疲労が抜けていった。
+// 「名前が出なければ休養」になってしまい、疲労管理が死んでいた。
+// 練習には出ているのだから、軽くても疲れる。
+const SIDELINE_LOAD = 10;
 
 // 選んだ練習を、部全体で1週間おこなう。
 //
@@ -646,7 +659,7 @@ function doWeek(menuKey) {
     return trainPlayer(player, menu, {
       ...mods,
       growth: mods.growth * SIDELINE_MULT,
-      fatigue: (mods.fatigue ?? 1) * SIDELINE_MULT,
+      load: SIDELINE_LOAD, // 選んだ練習の負荷ではなく、自主練ぶんだけ
       attending: false,
     });
   });
@@ -722,6 +735,8 @@ let lastGained = {};
 let lastEvent = null;
 // 直前に進んだメインストーリー
 let lastStory = null;
+// 直前に進んだサブイベント
+let lastSub = null;
 // 直前に選んだ選択肢の結果。
 // pendingChoice は「選んだ直後の1回だけ表示する」ための受け渡し用。
 // answerChoice が onNextWeek を呼ぶので、onNextWeek の頭で単純に
@@ -922,32 +937,45 @@ function menuTags(menu) {
     .join("");
 }
 
+// 練習盤の見出しと、練習できない週の案内。
+//
+// 「今週は何ができるのか」を、練習盤を見た瞬間に分かるようにする。
+// 以前はメニューを開かないと進行方法が分からず、行事の週に手が止まっていた。
 function renderNextButton() {
-  const btn = document.getElementById("next-week");
+  const hint = document.getElementById("train-hint");
+  const board = document.getElementById("menu-list");
+
   const finished = state.week >= TOTAL_WEEKS;
-  const event = getSchoolEvent(state.week);
   const tournament = getTournament(state.week);
-  btn.disabled = finished;
+  const event = getSchoolEvent(state.week);
+  const forced = event?.forced;
 
-  // 大会の週は、練習ではなく大会に挑むボタンになる
-  btn.className = tournament && canEnter(tournament) ? "next-btn cup-btn" : "next-btn";
-  btn.textContent = finished ? "シーズン終了"
-    : tournament && canEnter(tournament) ? `${tournament.icon} ${tournament.name}に挑む`
-    : tournament ? `▶ ${tournament.name}を見送る`
-    : event?.forced ? `▶ ${event.name}の1週間`
-    : event ? `▶ ${event.name}で1週間`
-    : "▶ 1週間 練習する";
+  // 練習できない週は、練習盤そのものを「進む」ボタンに差し替える。
+  // 押せないカードを並べても、何をすればいいのか分からない。
+  if (finished || tournament || forced) {
+    hint.textContent = "";
+    board.className = "train-blocked";
+    board.innerHTML = finished
+      ? `<div class="blocked-note">シーズン終了。おつかれさまでした。</div>`
+      : `<div class="blocked-note">
+           ${tournament ? `${tournament.icon} 今週は${tournament.name}です。`
+             : `${event.icon} 今週は${event.name}。部活動はありません。`}
+         </div>
+         <button class="next-btn ${tournament && canEnter(tournament) ? "cup-btn" : ""}" id="blocked-go">
+           ${tournament && canEnter(tournament) ? `${tournament.icon} ${tournament.name}に挑む`
+             : tournament ? `▶ ${tournament.name}を見送って次の週へ`
+             : `▶ ${event.name}の1週間を過ごす`}
+         </button>`;
 
-  // 練習試合も1週間を使うようになったので、
-  // 大会の週や部活動停止の週には組めない。
-  const matchBtn = document.getElementById("open-match");
-  const busy = finished || tournament || event?.forced;
-  matchBtn.disabled = Boolean(busy);
-  matchBtn.textContent = finished ? "シーズン終了"
-    : tournament ? `${tournament.name}の週`
-    : event?.forced ? `${event.name}の週`
-    : "🏀 練習試合を組む（1週）";
+    const go = document.getElementById("blocked-go");
+    if (go) go.addEventListener("click", () => onNextWeek());
+    return;
+  }
+
+  hint.textContent = "1つ選ぶと1週間進みます";
+  board.className = "train-board";
 }
+
 
 // 月頭のストーリーと、選択の結果。
 //
@@ -955,7 +983,11 @@ function renderNextButton() {
 // どちらも「その週に一度だけ読ませたいもの」なので、前面に出して、
 // 読み終わったら閉じてもらう形にする。
 function showStoryModal() {
-  if (!lastStory && !lastChoice) return;
+  // メインが無ければ、サブだけを出す
+  if (!lastStory && !lastChoice) {
+    showSubModal();
+    return;
+  }
 
   const panel = document.getElementById("story-panel");
 
@@ -990,6 +1022,53 @@ function showStoryModal() {
     // 一度読んだら消す。週を進めるたびに再表示されては困る。
     lastStory = null;
     lastChoice = null;
+    // 同じ週にサブイベントも起きていたら、メインを読み終えてから出す
+    showSubModal();
+  });
+}
+
+// サブイベント。メインストーリーと同じ週に起きたら、メインの後に出す。
+function showSubModal() {
+  if (!lastSub) return;
+
+  const panel = document.getElementById("story-panel");
+  const sub = lastSub;
+
+  // 三宅が関わる話では、彼女の顔も並べる
+  const faces = [
+    ...sub.cast.map(name => portraitByName(name, "mid", name)),
+    sub.withManager
+      ? `<div class="portrait mid" title="${MANAGER.name}">
+           <span class="portrait-initial">三</span>
+           <img src="${MANAGER.img}" alt="" onerror="this.style.display='none'">
+         </div>`
+      : "",
+  ].join("");
+
+  panel.innerHTML = `
+    <div class="story-modal-head">
+      <div class="sub-label">
+        <span class="sub-tag">部員の話</span>
+        ${sub.title}
+        <span class="sub-step">${sub.step} / ${sub.total}</span>
+      </div>
+      <div class="story-title">${sub.stepTitle}</div>
+    </div>
+
+    <div class="story-cast">${faces}</div>
+    <div class="story-text">${sub.text}</div>
+
+    ${sub.gained ? `<div class="sub-gained">${sub.gained}</div>` : ""}
+    ${sub.finished ? `<div class="sub-finished">この話は、ここで終わり</div>` : ""}
+
+    <button class="next-btn" id="story-close">続ける</button>`;
+
+  const overlay = document.getElementById("story-overlay");
+  overlay.classList.remove("hidden");
+
+  document.getElementById("story-close").addEventListener("click", () => {
+    overlay.classList.add("hidden");
+    lastSub = null;
   });
 }
 
@@ -1029,6 +1108,10 @@ function renderLog() {
           <div class="log-story">📖 ${entry.story.title}</div>` : ""}
         ${entry.event ? `
           <div class="log-special ${entry.event.good ? "good" : "bad"}">${entry.event.text}</div>` : ""}
+        ${entry.sub ? `
+          <div class="log-sub">
+            ${entry.sub.title} ${entry.sub.step}/${entry.sub.total} —「${entry.sub.stepTitle}」
+          </div>` : ""}
         <div class="log-lines">
           ${entry.lines.map(l => `
             <div class="log-line ${l.status}">
@@ -1058,7 +1141,7 @@ function renderAll() {
   renderEventBanner();
   renderRoster();
   renderMenus();
-  renderNextButton();
+  renderNextButton(); // 練習できない週は、上で描いた練習盤を差し替える
   renderLog();
   renderManagerComment(); // profile.js
   renderSaveInfo();
@@ -1187,6 +1270,11 @@ function onNextWeek(menuKey) {
     lastEvent = null;
   }
 
+  // サブイベントも別枠。上の抽選に混ぜると、他の出来事に押し出されて
+  // 一生出てこない（特殊戦術の習得で一度やった失敗）。
+  lastSub = rollSubEvent();
+  if (lastSub) state.log[0].sub = lastSub;
+
   tickBuff(); // バフの残り週数を減らす
   state.week++;
 
@@ -1258,6 +1346,8 @@ function loadGame() {
   // 古い仕様のセーブには顔ぶれが入っていない。その場で引き直す。
   if (!state.roster || !Object.keys(state.roster).length) state.roster = rollRoster();
   if (!state.menuCount) state.menuCount = {};
+  if (!state.subs) state.subs = {};
+  if (!state.subLast) state.subLast = {};
   matchState.lineup = [];   // 古い選手への参照を捨てる
   matchState.tournament = null;
   lastEvent = null;
@@ -1279,7 +1369,8 @@ function renderSaveInfo() {
   const box = document.getElementById("save-info");
   const data = readSave();
   box.textContent = data ? `最終セーブ: ${getDateLabel(data.week)}` : "セーブなし";
-  document.getElementById("load-btn").disabled = !data;
+  const loadBtn = document.getElementById("menu-load");
+  if (loadBtn) loadBtn.disabled = !data;
 }
 
 // 「セーブしました」を一瞬だけ出す
@@ -1308,13 +1399,6 @@ function openDrawer() {
   const event = getSchoolEvent(state.week);
   const finished = state.week >= TOTAL_WEEKS;
 
-  const weekBtn = document.getElementById("menu-week");
-  weekBtn.disabled = finished;
-  weekBtn.textContent = finished ? "シーズン終了"
-    : tournament && canEnter(tournament) ? `${tournament.icon} ${tournament.name}に挑む`
-    : event?.forced ? `▶ ${event.name}の1週間`
-    : "▶ 1週間 進める";
-
   const matchBtn = document.getElementById("menu-match");
   matchBtn.disabled = Boolean(finished || tournament || event?.forced);
 
@@ -1339,15 +1423,7 @@ function fromDrawer(fn) {
 // 全部のファイルが読み込まれてから動かす必要がある。
 // DOMContentLoaded は、末尾に並べた script が全部終わってから発火する。
 document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("next-week").addEventListener("click", onNextWeek);
-  document.getElementById("open-match").addEventListener("click", () => openMatch());
-  document.getElementById("open-history").addEventListener("click", () => openHistory());
-  document.getElementById("open-notebook").addEventListener("click", () => openNotebook());
-  document.getElementById("save-btn").addEventListener("click", () => saveGame());
-  document.getElementById("load-btn").addEventListener("click", () => loadGame());
-  document.getElementById("reset-btn").addEventListener("click", () => resetGame());
-
-  // バーガーメニュー
+  // 入口はメニューに1本化した
   document.getElementById("burger").addEventListener("click", openDrawer);
   document.getElementById("drawer-close").addEventListener("click", closeDrawer);
   // 外側（暗い部分）を押しても閉じる
@@ -1355,11 +1431,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.target.id === "menu-drawer") closeDrawer();
   });
 
-  document.getElementById("menu-week").addEventListener("click", fromDrawer(onNextWeek));
   document.getElementById("menu-match").addEventListener("click", fromDrawer(openMatch));
   document.getElementById("menu-notebook").addEventListener("click", fromDrawer(openNotebook));
   document.getElementById("menu-history").addEventListener("click", fromDrawer(openHistory));
   document.getElementById("menu-save").addEventListener("click", fromDrawer(() => saveGame()));
+  document.getElementById("menu-load").addEventListener("click", fromDrawer(() => loadGame()));
   document.getElementById("menu-reset").addEventListener("click", fromDrawer(resetGame));
 
   // 続きがあればそこから、なければ4月1週目の話から始める

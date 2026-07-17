@@ -19,21 +19,14 @@
 <body>
 
   <header class="header">
-    <!-- スマホ用の入口。パソコンでは隠れる（右パネルに全部あるので） -->
-    <button id="burger" class="burger" aria-label="メニュー">☰</button>
-
     <h1>🏀 ウィンターカップへの道</h1>
     <div class="date-box">
       <span id="date-label">4月 1週目</span>
       <span id="weeks-left" class="weeks-left"></span>
     </div>
 
-    <div class="save-box">
-      <span id="save-info" class="save-info">セーブなし</span>
-      <button id="save-btn" class="save-btn">💾 セーブ</button>
-      <button id="load-btn" class="save-btn">📂 ロード</button>
-      <button id="reset-btn" class="save-btn danger">↺ 最初から</button>
-    </div>
+    <!-- セーブもここから。入口を1つにまとめる。 -->
+    <button id="burger" class="burger">☰ メニュー</button>
   </header>
 
   <!-- 年間カレンダー。先の行事が見えるから、計画が立てられる -->
@@ -42,12 +35,14 @@
     <div id="calendar" class="calendar"></div>
   </section>
 
-  <!-- 特殊イベントが起きたときだけ出る -->
-  <div id="event-banner" class="event-banner hidden"></div>
-
-  <!-- 練習盤。毎週ここで1つ選ぶ。このゲームの中心。 -->
+  <!-- 練習盤。毎週ここで1つ選ぶ。このゲームの中心。
+       今週の状況（行事・バフ・出来事）は、選ぶ前に読めるよう真上に置く。 -->
   <section class="panel train-panel">
-    <h2>今週の練習<span class="train-hint">1つ選ぶと1週間進みます</span></h2>
+    <h2>今週の練習<span class="train-hint" id="train-hint">1つ選ぶと1週間進みます</span></h2>
+
+    <div id="upcoming"></div>
+    <div id="event-banner" class="event-banner hidden"></div>
+
     <div id="menu-list" class="train-board"></div>
   </section>
 
@@ -71,15 +66,6 @@
 
     <!-- 右：週の進行・一括設定・メニュー表・ログ -->
     <aside class="panel">
-      <h2>今週の予定</h2>
-      <div id="upcoming"></div>
-      <button id="next-week" class="next-btn">▶ 1週間 進める</button>
-      <button id="open-match" class="match-btn">🏀 練習試合を組む</button>
-      <div class="menu-tabs">
-        <button id="open-notebook" class="match-btn subtle">📔 三宅の手帳</button>
-        <button id="open-history" class="match-btn subtle">📊 戦歴</button>
-      </div>
-
       <h2>特殊戦術</h2>
       <div id="tactic-progress"></div>
 
@@ -124,13 +110,19 @@
         <span id="drawer-date">4月 1週目</span>
         <button class="close-btn" id="drawer-close">✕</button>
       </div>
-      <button class="drawer-item main" id="menu-week">▶ 1週間 進める</button>
-      <button class="drawer-item" id="menu-match">🏀 練習試合（1週）</button>
+
+      <button class="drawer-item main" id="menu-match">🏀 練習試合を組む（1週）</button>
       <button class="drawer-item" id="menu-notebook">📔 三宅の手帳</button>
       <button class="drawer-item" id="menu-history">📊 戦歴</button>
+
       <div class="drawer-sep"></div>
-      <button class="drawer-item sub" id="menu-save">💾 セーブ</button>
-      <button class="drawer-item sub" id="menu-reset">↺ 最初から</button>
+
+      <div class="drawer-save">
+        <span id="save-info" class="save-info">セーブなし</span>
+      </div>
+      <button class="drawer-item sub" id="menu-save">💾 セーブする</button>
+      <button class="drawer-item sub" id="menu-load">📂 セーブから再開</button>
+      <button class="drawer-item sub danger" id="menu-reset">↺ 最初からやり直す</button>
     </div>
   </nav>
 
@@ -143,6 +135,7 @@
   <script src="match.js"></script>
   <script src="history.js"></script>
   <script src="profile.js"></script>
+  <script src="subevents.js"></script>
   <script src="ending.js"></script>
 </body>
 </html>
