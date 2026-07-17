@@ -1201,11 +1201,27 @@ function tickBuff() {
 
 // ---- 5. カレンダー -----------------------------------
 // 4月から12月まで、1ヶ月4週で並べる。先の予定が見えるから計画が立てられる。
+// 画面が狭いとき、9ヶ月ぶん36マスを詰め込むとマスが潰れて何も読めない。
+// 「今どのへんか」と「次に何が来るか」さえ分かればいいので、
+// 狭い画面では今の前後だけを見せ、週が進むと先が現れるようにする。
+//
+// 過去を1ヶ月ぶん残すのは、「もう終わった大会」の結果を見返せるようにするため。
+function visibleMonths() {
+  const total = 9;
+  if (window.innerWidth > 640) return { from: 0, to: total }; // パソコンは全部見せる
+
+  const nowMonth = Math.floor(state.week / 4);
+  const from = Math.max(0, Math.min(nowMonth - 1, total - 4));
+  return { from, to: Math.min(total, from + 4) };
+}
+
 function renderCalendar() {
   const box = document.getElementById("calendar");
+  const range = visibleMonths();
+  const hidden = 9 - (range.to - range.from);
 
   const months = [];
-  for (let m = 0; m < 9; m++) {
+  for (let m = range.from; m < range.to; m++) {
     const monthLabel = ((3 + m) % 12) + 1;
 
     const cells = [];
@@ -1240,7 +1256,15 @@ function renderCalendar() {
       </div>`);
   }
 
-  box.innerHTML = months.join("");
+  // 隠れているぶんがあることは伝える。全部見えていると誤解させない。
+  const note = hidden > 0
+    ? `<div class="cal-more" title="画面が狭いので、今の前後だけ表示しています">
+         <span>…</span>
+         <span class="cal-more-count">残り${9 - range.to}ヶ月</span>
+       </div>`
+    : "";
+
+  box.innerHTML = months.join("") + note;
 }
 
 // 特殊戦術の習得状況。

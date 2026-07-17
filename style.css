@@ -139,6 +139,22 @@ button, select { -webkit-tap-highlight-color: transparent; }
 .cal-lost { background: #35191c; border-color: #ff6b6b; }
 .cal-skipped { opacity: 0.4; }
 
+/* 表示しきれていない月がある、と伝える印 */
+.cal-more {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--muted);
+  cursor: help;
+  padding-left: 2px;
+}
+
+.cal-more span:first-child { font-size: 14px; letter-spacing: 1px; }
+.cal-more-count { font-size: 8px; white-space: nowrap; }
+
 .cal-cell.past { opacity: 0.35; }
 
 /* 結果の出た大会は、過去でも薄くしない（記録として見せる） */
@@ -1920,6 +1936,203 @@ button, select { -webkit-tap-highlight-color: transparent; }
 
 
 /* ============================================
+   評価（F〜S）
+   数字を読まなくても、色と字で強弱が分かるようにする
+   ============================================ */
+
+.rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  border-radius: 4px;
+  cursor: help;
+  font-size: 12px;
+  font-weight: bold;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.rank-s { background: linear-gradient(135deg, #ff7a2f, #ffd166); color: #1a1005; }
+.rank-a { background: #45231a; color: #ff9f7a; }
+.rank-b { background: #16341f; color: #6ee787; }
+.rank-c { background: #1d2a3a; color: #7bb0ff; }
+.rank-d { background: #232936; color: var(--muted); }
+.rank-e { background: #232936; color: #6b7688; }
+.rank-f { background: #1a1d24; color: #4e5866; }
+
+
+/* ============================================
+   バーガーメニュー
+   ============================================ */
+
+.burger {
+  display: none; /* パソコンでは出さない。右のパネルに全部あるので。 */
+  background: #232936;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 8px 12px;
+}
+
+.drawer {
+  position: fixed;
+  inset: 0;
+  background: #05070ce0;
+  z-index: 20;
+}
+
+.drawer.hidden { display: none; }
+
+.drawer-panel {
+  background: var(--panel);
+  border-bottom: 1px solid var(--accent);
+  border-radius: 0 0 14px 14px;
+  padding: 12px;
+  padding-top: max(12px, env(safe-area-inset-top));
+}
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+}
+
+.drawer-item {
+  display: block;
+  width: 100%;
+  background: #232936;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 15px;
+  margin-bottom: 7px;
+  padding: 14px;
+  text-align: left;
+}
+
+.drawer-item:hover { border-color: var(--accent); }
+
+.drawer-item:disabled { opacity: 0.35; }
+
+/* いちばん使うものだけ目立たせる */
+.drawer-item.main {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1a1005;
+  font-weight: bold;
+}
+
+.drawer-item.sub {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 10px 14px;
+}
+
+.drawer-sep {
+  border-top: 1px solid var(--line);
+  margin: 10px 0;
+}
+
+
+/* ============================================
+   練習指示メニュー
+   ============================================ */
+
+.order-bulk {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #171b24;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+}
+
+.order-bulk label {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.order-bulk select { flex: 1; }
+
+.order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.order-row {
+  display: grid;
+  grid-template-columns: auto 1fr 160px;
+  align-items: center;
+  gap: 10px;
+  background: #232936;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.order-row.injured { opacity: 0.5; }
+
+.order-face {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.order-main { min-width: 0; }
+
+.order-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 4px;
+}
+
+.order-name { font-size: 13px; font-weight: bold; white-space: nowrap; }
+.order-ovr { margin-left: auto; }
+
+/* ポジションごとに大事な3つだけ */
+.order-ranks {
+  display: flex;
+  gap: 10px;
+}
+
+.order-rank {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.order-rank-name { color: var(--muted); font-size: 10px; }
+
+.order-fatigue { margin-top: 5px; }
+.order-fatigue .stat-track { height: 4px; }
+
+.order-legend {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.7;
+  margin: 12px 0;
+}
+
+
+/* ============================================
    スマホ
    ============================================
 
@@ -1968,25 +2181,50 @@ button, select { -webkit-tap-highlight-color: transparent; }
   .swap-btn { padding: 7px 6px; }
 
   /* --- カレンダー --- */
-  /* 9ヶ月ぶんは指1本で追える幅ではないので、詰めて全部見せる */
-  .calendar { gap: 5px; }
-  .cal-weeks { gap: 2px; }
+  /* 9ヶ月ぶん36マスを画面幅に詰めるとマスが潰れて読めない。
+     JS側で今の前後4ヶ月だけに絞っているので、1マスを大きく取れる。 */
+  .calendar { gap: 6px; }
+  .cal-weeks { gap: 3px; }
 
   .cal-cell {
     width: 100%;
-    min-width: 15px;
-    height: 26px;
-    font-size: 9px;
+    min-width: 0;
+    height: 32px;
+    font-size: 13px;
   }
 
   .cal-month { flex: 1 1 0; min-width: 0; }
-  .cal-label { font-size: 9px; }
+  .cal-label { font-size: 10px; }
 
   /* --- 活動記録 --- */
   .log { height: 220px; }
 
   /* --- 部員カード --- */
   .roster { grid-template-columns: 1fr; }
+
+  /* --- バーガーメニュー --- */
+  .burger { display: block; }
+
+  /* 右のパネルはメニューから開けるので、スマホでは畳んでおく。
+     ただし消しはしない（メニュー表や特殊戦術の進捗は見たいので、下に残る） */
+  .layout > .panel:last-child .next-btn,
+  .layout > .panel:last-child .match-btn,
+  .layout > .panel:last-child .menu-tabs { display: none; }
+
+  /* --- 練習指示 --- */
+  /* 3列は狭すぎて潰れる。名前と評価を上、選択欄を下に敷く。 */
+  .order-row {
+    grid-template-columns: auto 1fr;
+    gap: 8px;
+  }
+
+  .order-select {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .order-ranks { gap: 8px; }
+  .order-name { font-size: 14px; }
 
   /* --- オーバーレイ（試合・手帳・戦歴） --- */
   .overlay { padding: 8px; }

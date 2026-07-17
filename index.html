@@ -19,6 +19,9 @@
 <body>
 
   <header class="header">
+    <!-- スマホ用の入口。パソコンでは隠れる（右パネルに全部あるので） -->
+    <button id="burger" class="burger" aria-label="メニュー">☰</button>
+
     <h1>🏀 ウィンターカップへの道</h1>
     <div class="date-box">
       <span id="date-label">4月 1週目</span>
@@ -66,9 +69,10 @@
       <div id="upcoming"></div>
       <button id="next-week" class="next-btn">▶ 1週間 練習する</button>
       <button id="open-match" class="match-btn">🏀 練習試合を組む</button>
+      <button id="open-orders" class="match-btn subtle">📋 練習指示をまとめて出す</button>
       <div class="menu-tabs">
         <button id="open-notebook" class="match-btn subtle">📔 三宅の手帳</button>
-        <button id="open-history" class="match-btn subtle">📋 戦歴</button>
+        <button id="open-history" class="match-btn subtle">📊 戦歴</button>
       </div>
 
       <div class="bulk">
@@ -115,6 +119,29 @@
     <div class="ending-panel" id="ending-panel"></div>
   </div>
 
+  <!-- 練習指示。スマホでカードを1枚ずつ触らずに済むように -->
+  <div id="orders-overlay" class="overlay hidden">
+    <div class="match-panel" id="orders-panel"></div>
+  </div>
+
+  <!-- バーガーメニュー -->
+  <nav id="menu-drawer" class="drawer hidden">
+    <div class="drawer-panel">
+      <div class="drawer-head">
+        <span id="drawer-date">4月 1週目</span>
+        <button class="close-btn" id="drawer-close">✕</button>
+      </div>
+      <button class="drawer-item main" id="menu-orders">📋 練習指示</button>
+      <button class="drawer-item" id="menu-week">▶ 1週間 進める</button>
+      <button class="drawer-item" id="menu-match">🏀 練習試合（1週）</button>
+      <button class="drawer-item" id="menu-notebook">📔 三宅の手帳</button>
+      <button class="drawer-item" id="menu-history">📊 戦歴</button>
+      <div class="drawer-sep"></div>
+      <button class="drawer-item sub" id="menu-save">💾 セーブ</button>
+      <button class="drawer-item sub" id="menu-reset">↺ 最初から</button>
+    </div>
+  </nav>
+
   <!-- 読み込む順番に意味がある。
        game.js が土台（選手データと週の進行）、
        events.js と match.js はその上で動く。
@@ -125,5 +152,6 @@
   <script src="history.js"></script>
   <script src="profile.js"></script>
   <script src="ending.js"></script>
+  <script src="orders.js"></script>
 </body>
 </html>

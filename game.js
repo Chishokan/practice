@@ -386,6 +386,36 @@ function calcAllDerived(player) {
   return result;
 }
 
+// ---- 6.5 評価（F〜S）---------------------------------
+//
+// 数字を全部読むのは疲れる。特にスマホでは、バーを見比べる余裕がない。
+// 「85」より「A」のほうが、一瞬で強い弱いが分かる。
+// 数字は詳細ページに残してあるので、こちらは「およその状況」を掴むためのもの。
+// 刻みは、このゲームで実際に出る幅（およそ30〜85）に合わせてある。
+// 均等に10ずつ切ると、4月がD・12月がBで、1年育てても2段階しか動かない。
+// それでは成長が見えない。
+//   4月の部員   … F〜C（まだ何者でもない）
+//   12月の主力  … B〜S（1年でここまで来た）
+const RANKS = [
+  { min: 80, label: "S", cls: "rank-s" },
+  { min: 70, label: "A", cls: "rank-a" },
+  { min: 62, label: "B", cls: "rank-b" },
+  { min: 54, label: "C", cls: "rank-c" },
+  { min: 46, label: "D", cls: "rank-d" },
+  { min: 38, label: "E", cls: "rank-e" },
+  { min: 0,  label: "F", cls: "rank-f" },
+];
+
+function rankOf(value) {
+  return RANKS.find(r => value >= r.min);
+}
+
+// 「B」のような字を出す
+function rankBadge(value, title = "") {
+  const rank = rankOf(value);
+  return `<span class="rank ${rank.cls}" ${title ? `title="${title}"` : ""}>${rank.label}</span>`;
+}
+
 // 総合力(OVR)。試合能力をポジションの重要度で重み付けした平均。
 function calcOvr(player) {
   const derived = calcAllDerived(player);
@@ -711,6 +741,7 @@ function renderRoster() {
         <span class="player-pos">${player.pos}</span>
         <span class="player-year">${player.year}年</span>
         <span class="cond-badge ${condition.cls}">${condition.label}</span>
+        ${rankBadge(calcOvr(player), `${player.pos}としての総合力 ${calcOvr(player)}`)}
         <span class="player-ovr" title="${player.pos}としての総合力">${calcOvr(player)}</span>
       </div>
       ${skills ? `<div class="skills">${skills}</div>` : ""}
@@ -1197,6 +1228,46 @@ function flashSaveNote(text) {
 }
 
 
+// ---- 11.8 バーガーメニュー ----------------------------
+//
+// スマホでは右のパネルが画面の下のほうまで流れてしまい、
+// 「1週間進める」を押すのにスクロールが要る。
+// 主要な入口を1箇所にまとめて、いつでも指の届く場所に置く。
+
+function openDrawer() {
+  document.getElementById("drawer-date").textContent = getDateLabel(state.week);
+
+  // 今週できないことは、メニューでも押せなくしておく
+  const tournament = getTournament(state.week);
+  const event = getSchoolEvent(state.week);
+  const finished = state.week >= TOTAL_WEEKS;
+
+  const weekBtn = document.getElementById("menu-week");
+  weekBtn.disabled = finished;
+  weekBtn.textContent = finished ? "シーズン終了"
+    : tournament && canEnter(tournament) ? `${tournament.icon} ${tournament.name}に挑む`
+    : event?.forced ? `▶ ${event.name}の1週間`
+    : "▶ 1週間 進める";
+
+  const matchBtn = document.getElementById("menu-match");
+  matchBtn.disabled = Boolean(finished || tournament || event?.forced);
+
+  document.getElementById("menu-drawer").classList.remove("hidden");
+}
+
+function closeDrawer() {
+  document.getElementById("menu-drawer").classList.add("hidden");
+}
+
+// メニューから何かを選んだら、まず閉じてから実行する
+function fromDrawer(fn) {
+  return () => {
+    closeDrawer();
+    fn();
+  };
+}
+
+
 // ---- 12. ゲーム開始 ----------------------------------
 // events.js や match.js の関数を使うので、
 // 全部のファイルが読み込まれてから動かす必要がある。
@@ -1207,9 +1278,26 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("open-match").addEventListener("click", () => openMatch());
   document.getElementById("open-history").addEventListener("click", () => openHistory());
   document.getElementById("open-notebook").addEventListener("click", () => openNotebook());
+  document.getElementById("open-orders").addEventListener("click", () => openOrders());
   document.getElementById("save-btn").addEventListener("click", () => saveGame());
   document.getElementById("load-btn").addEventListener("click", () => loadGame());
   document.getElementById("reset-btn").addEventListener("click", () => resetGame());
+
+  // バーガーメニュー
+  document.getElementById("burger").addEventListener("click", openDrawer);
+  document.getElementById("drawer-close").addEventListener("click", closeDrawer);
+  // 外側（暗い部分）を押しても閉じる
+  document.getElementById("menu-drawer").addEventListener("click", e => {
+    if (e.target.id === "menu-drawer") closeDrawer();
+  });
+
+  document.getElementById("menu-orders").addEventListener("click", fromDrawer(openOrders));
+  document.getElementById("menu-week").addEventListener("click", fromDrawer(onNextWeek));
+  document.getElementById("menu-match").addEventListener("click", fromDrawer(openMatch));
+  document.getElementById("menu-notebook").addEventListener("click", fromDrawer(openNotebook));
+  document.getElementById("menu-history").addEventListener("click", fromDrawer(openHistory));
+  document.getElementById("menu-save").addEventListener("click", fromDrawer(() => saveGame()));
+  document.getElementById("menu-reset").addEventListener("click", fromDrawer(resetGame));
 
   // 続きがあればそこから、なければ4月1週目の話から始める
   if (readSave()) {
@@ -1223,4 +1311,12 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   previewEnding(); // ?ending=champion のときだけ動く（確認用）
+
+  // 画面を回したり幅を変えたら、カレンダーの表示範囲を決め直す。
+  // 縦横で見せられる月数が変わるため。
+  let resizeTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => renderCalendar(), 150);
+  });
 });
