@@ -54,17 +54,33 @@ function renderGallery() {
         </button>`;
     }).join("");
 
+    // ヒントは、まだ終わっていない話にだけ出す。
+    // 「起こしたい」と思わせるのが目的なので、終わった話には要らない。
+    //
+    // タイトルは伏せたままヒントだけ見せる。
+    // 何の話かは分からないが、何をすれば動くかは分かる、という状態にする。
+    const done_all = done >= sub.steps.length;
+    const hintText = done_all ? null : (started ? sub.hintAfter : sub.hint);
+
     return `
       <div class="gal-sub ${started ? "" : "unknown"}">
         <div class="gal-sub-head">
           <span class="gal-stars rarity${sub.rarity ?? 1}">${stars}</span>
           <span class="gal-title">${started ? sub.title : "??? "}</span>
-          <span class="gal-prog ${done === sub.steps.length ? "done" : ""}">
+          <span class="gal-prog ${done_all ? "done" : ""}">
             ${done} / ${sub.steps.length}
           </span>
         </div>
         ${started ? `<div class="gal-cast">${who.join(" × ")}</div>` : ""}
         <div class="gal-steps">${steps}</div>
+        ${hintText ? `
+          <div class="gal-hint">
+            <div class="portrait small" title="${MANAGER.name}">
+              <span class="portrait-initial">三</span>
+              <img src="${MANAGER.img}" alt="" onerror="this.style.display='none'">
+            </div>
+            <div class="gal-hint-text">${hintText}</div>
+          </div>` : ""}
       </div>`;
   }).join("");
 
@@ -87,7 +103,7 @@ function renderGallery() {
     <div class="gal-list">${mainRows}</div>
 
     <div class="section-label">
-      部員の話<span class="section-note">★が多いほど起きにくい</span>
+      部員の話<span class="section-note">★が多いほど起きにくい／三宅の書き込みは当てにならないこともある</span>
     </div>
     ${subRows}
 

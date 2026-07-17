@@ -2628,6 +2628,29 @@ button, select { -webkit-tap-highlight-color: transparent; }
 
 .gal-step:hover:not(:disabled) { border-color: var(--accent); }
 
+/* 三宅の書き込み。
+   手帳の余白に書かれたメモ、という見え方にする。
+   本文（読んだ話）とは色も字も変えて、地の文と混ざらないようにする。 */
+.gal-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: #1a1826;
+  border-left: 2px solid #4a3d6b;
+  border-radius: 0 6px 6px 0;
+  margin-top: 8px;
+  padding: 8px 10px;
+}
+
+.gal-hint .portrait { flex: 0 0 auto; }
+
+.gal-hint-text {
+  color: #b0a0d8;
+  font-size: 11px;
+  line-height: 1.8;
+  white-space: pre-line;
+}
+
 /* 読み返し */
 .gal-read {
   background: #171b24;
