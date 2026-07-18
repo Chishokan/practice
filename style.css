@@ -2756,3 +2756,99 @@ button, select { -webkit-tap-highlight-color: transparent; }
   .clear-cups { grid-template-columns: 1fr; }
   .clear-actions { grid-template-columns: 1fr; }
 }
+
+
+/* ============================================
+   試合メニュー（交代・作戦をボタンの裏に）
+   ============================================ */
+
+/* ふだんの操作欄：作戦の要約と、開くボタン */
+.ctrl-box {
+  background: #171b24;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  padding: 12px;
+}
+
+.ctrl-tactics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.ctrl-label {
+  color: var(--muted);
+  font-size: 11px;
+  margin-right: 4px;
+}
+
+.ctrl-menu {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.match-menu-btn {
+  background: #232936;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  padding: 12px;
+}
+
+.match-menu-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* 交代・作戦の個別画面の見出し */
+.sub-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.sub-panel-title { font-size: 15px; font-weight: bold; }
+
+
+/* ============================================
+   クオーター間の作戦タイム
+   ============================================ */
+
+.qchoice-panel { border-left: 3px solid var(--accent); }
+
+.qchoice-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.qchoice-tag {
+  background: var(--accent);
+  border-radius: 4px;
+  color: #1a1005;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 3px 10px;
+}
+
+.qchoice-score {
+  margin-left: auto;
+  font-size: 20px;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
+
+.qchoice-text {
+  border-left: 2px solid var(--line);
+  margin-bottom: 16px;
+  padding-left: 12px;
+}
+
+/* 作戦タイムで選んだことは、実況で少し目立たせる */
+.ev.choice { color: #ffd166; }

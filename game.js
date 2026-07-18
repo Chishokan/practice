@@ -46,6 +46,43 @@ const DERIVED_STATS = [
 ];
 
 
+// ---- 2.5 ポジション別の計算式 ------------------------
+//
+// 同じ「シュート力」でも、ガードとセンターでは中身が違う。
+// ガードは形（テクニック・IQ）で打ち、センターは高さと力でねじ込む。
+// ディフェンスも同じで、ガードは足で止め、センターは高さで壁になる。
+//
+// 基礎値が同じでも、ポジションによって試合能力の出方が変わる。
+// 緑川（パワー高・スピード低）はCなら守れるが、ガードなら守れない。
+//
+// ここに載っている key（shoot/defense）だけ、ポジションで上書きする。
+// 残り（drive/pass/rebound）は全ポジション共通（DERIVED_STATS のまま）。
+const POS_FORMULA = {
+  // インサイド … ゴール下で完結する
+  PF: {
+    shoot:   { tech: 0.35, power: 0.30, jump: 0.20, iq: 0.15 },
+    defense: { power: 0.40, jump: 0.25, iq: 0.20, stamina: 0.15 },
+  },
+  C: {
+    shoot:   { tech: 0.30, power: 0.35, jump: 0.25, iq: 0.10 },
+    defense: { power: 0.45, jump: 0.25, iq: 0.20, stamina: 0.10 },
+  },
+  // アウトサイド … 形と足で勝負する
+  PG: {
+    shoot:   { tech: 0.50, iq: 0.30, jump: 0.10, power: 0.10 },
+    defense: { speed: 0.40, iq: 0.30, stamina: 0.20, power: 0.10 },
+  },
+  SG: {
+    shoot:   { tech: 0.50, iq: 0.28, jump: 0.12, power: 0.10 },
+    defense: { speed: 0.38, iq: 0.28, stamina: 0.22, power: 0.12 },
+  },
+  SF: {
+    shoot:   { tech: 0.45, iq: 0.25, jump: 0.15, power: 0.15 },
+    defense: { speed: 0.32, power: 0.25, iq: 0.23, stamina: 0.20 },
+  },
+};
+
+
 // ---- 3. ポジションごとの重要度 ------------------------
 // 同じ能力でも、ポジションによって価値が違う。
 // センターのパス力より、ポイントガードのパス力のほうが重い。
@@ -425,8 +462,13 @@ function getDateLabel(week) {
 // 基礎パラメータから試合能力を1つ計算する。
 // 重み付き平均なので、weightsの合計が1.0なら結果も0〜100に収まる。
 function calcDerived(player, derived) {
+  // ポジション別の式があればそれを使う。無ければ共通の式。
+  // 相手校は pos を持たないので、いつも共通の式になる。
+  const posWeights = player.pos && POS_FORMULA[player.pos]?.[derived.key];
+  const weights = posWeights ?? derived.weights;
+
   let total = 0;
-  for (const [baseKey, weight] of Object.entries(derived.weights)) {
+  for (const [baseKey, weight] of Object.entries(weights)) {
     total += player.base[baseKey] * weight;
   }
   return Math.round(total);

@@ -78,9 +78,9 @@ const TOURNAMENTS = [
     desc: "夏の全国への切符。ここを勝ち抜かないと8月の全国はない。",
     expScale: 1.2,
     rounds: [
-      { label: "1回戦", school: makeSchool("城東高校", 38, "BALANCED", "MOTION", "MAN", "格下", "1回戦の相手。") },
-      { label: "準決勝", school: makeSchool("北嶺高校", 44, "BIG", "POST", "ZONE", "互角", "リバウンドが強い。") },
-      { label: "決勝", school: makeSchool("明星学園", 49, "RUN", "FAST", "PRESS", "強豪", "県の王者。走って守る。") },
+      { label: "1回戦", school: makeSchool("城東高校", 40, "BALANCED", "MOTION", "MAN", "格下", "1回戦の相手。") },
+      { label: "準決勝", school: makeSchool("北嶺高校", 46, "BIG", "POST", "ZONE", "互角", "リバウンドが強い。") },
+      { label: "決勝", school: makeSchool("明星学園", 51, "RUN", "FAST", "PRESS", "強豪", "県の王者。走って守る。") },
     ],
   },
   {
@@ -103,10 +103,10 @@ const TOURNAMENTS = [
     // 冬の各校は新チーム。こちらは1年かけて仕上がっている。
     // この非対称が「全国のほうが難しい」を自然に作っている。
     rounds: [
-      { label: "1回戦", school: makeSchool("城北付属", 48, "BALANCED", "MOTION", "MAN", "格下", "堅実だが決め手に欠ける。") },
-      { label: "2回戦", school: makeSchool("天王寺学院", 54, "SKILL", "OUTSIDE", "ZONE", "強豪", "3Pが当たると止まらない。") },
-      { label: "準決勝", school: makeSchool("明星学園", 56, "RUN", "FAST", "PRESS", "強豪", "夏から一回り成長している。") },
-      { label: "決勝", school: makeSchool("帝王実業", 61, "SKILL", "OUTSIDE", "MAN", "絶対王者", "3年生が抜けてなお王者。ここを倒せば日本一。") },
+      { label: "1回戦", school: makeSchool("城北付属", 52, "BALANCED", "MOTION", "MAN", "格下", "堅実だが決め手に欠ける。") },
+      { label: "2回戦", school: makeSchool("天王寺学院", 58, "SKILL", "OUTSIDE", "ZONE", "強豪", "3Pが当たると止まらない。") },
+      { label: "準決勝", school: makeSchool("明星学園", 60, "RUN", "FAST", "PRESS", "強豪", "夏から一回り成長している。") },
+      { label: "決勝", school: makeSchool("帝王実業", 65, "SKILL", "OUTSIDE", "MAN", "絶対王者", "3年生が抜けてなお王者。ここを倒せば日本一。") },
     ],
   },
 ];
@@ -413,6 +413,45 @@ function pickWeighted(units, keys) {
   return units[units.length - 1];
 }
 
+// ---- 6.5 ポジションの役割 ----------------------------
+//
+// 同じ「ディフェンス力70」でも、Cとガードでは仕事が違う。
+// ここで、誰が何を担うかを分ける。
+//   インサイド … PF・C。ゴール下の得点と、リムでの守り
+//   アウトサイド … PG・SG・SF。3Pと、パスカット（スティール）
+const INSIDE_POS = ["PF", "C"];
+const PERIMETER_POS = ["PG", "SG", "SF"];
+
+// そのポジション群に該当する選手。いなければ全員から選ぶ。
+function playersAt(lineup, positions) {
+  const list = lineup.filter(p => p.pos && positions.includes(p.pos));
+  return list.length ? list : lineup;
+}
+
+// リムの守り。C・PFのディフェンス力が、相手のインサイド得点を直接止める。
+// いちばん高い1人（＝ゴール下に立つ番人）を見る。
+function rimProtection(lineup) {
+  const bigs = lineup.filter(p => p.pos && INSIDE_POS.includes(p.pos));
+  if (!bigs.length) return 40;
+  return Math.max(...bigs.map(p => getStat(p, "defense")));
+}
+
+// 外の守り。PG・SG・SFのディフェンス力の平均。
+// 高いほどパスを読み、スティールが増える。
+function perimeterDefense(lineup) {
+  const guards = lineup.filter(p => p.pos && PERIMETER_POS.includes(p.pos));
+  const list = guards.length ? guards : lineup;
+  return list.reduce((s, p) => s + getStat(p, "defense"), 0) / list.length;
+}
+
+// インサイドをどれだけ突くか。大きい選手が強いほど、中で勝負する。
+function insideRatio(lineup) {
+  const bigs = lineup.filter(p => p.pos && INSIDE_POS.includes(p.pos));
+  if (!bigs.length) return 0.30;
+  const power = bigs.reduce((s, p) => s + getStat(p, "rebound"), 0) / bigs.length;
+  return Math.max(0.25, Math.min(0.60, 0.20 + power / 250)); // リバウンド70で0.48
+}
+
 // 個人成績を1つ足す
 function addBox(player, key, value = 1) {
   matchState.box[player.name][key] += value;
@@ -459,15 +498,35 @@ function simulatePossession(isHome) {
     offRating += clutchCount * 3;
   }
 
+  // 「ムードメーカー」がコートにいると、いる間ずっと少しだけ底上げ。
+  // 派手さはないが、全部の時間に効くので、地味に大きい。
+  if (isHome) {
+    for (const p of ms.lineup) {
+      if (hasSkill(p, "MOOD")) offRating += SKILLS.MOOD.mood;
+    }
+  }
+
+  // クオーター間の選択によるバフ。次の1Qだけ効く、ごく小さいもの。
+  // 勝敗を決めるほどではない。「自分で流れを作った」感覚のためのもの。
+  if (ms.qBuff) {
+    if (isHome) offRating += ms.qBuff.off;   // 円陣＝攻めが少し上がる
+    else offRating -= ms.qBuff.def;          // 締めろ＝相手が少し下がる
+  }
+
   const diff = offRating - defRating; // これがプラスなら攻撃側が有利
 
   // --- ターンオーバー判定 ---
   // プレスは奪う確率が高い。パスとIQが高ければ耐えられる。
-  const toChance = Math.min(0.30, Math.max(0.03, defTactic.steal - diff * 0.003));
+  // 守る側の「外の守り」が高いほど、パスを読んで奪う。
+  const perimD = perimeterDefense(defLineup);
+  const stealBoost = (perimD - 50) * 0.0025; // 外の守り70で+5%
+  let toChance = Math.min(0.32, Math.max(0.03, defTactic.steal + stealBoost - diff * 0.003));
+  // 「落ち着いていこう」を選ぶと、自分たちのミスが少し減る
+  if (isHome && ms.qBuff) toChance = Math.max(0.02, toChance - ms.qBuff.calm);
   if (Math.random() < toChance) {
     if (!isHome) {
-      // 相手のミスを誰が奪ったか
-      const stealer = pickWeighted(ms.lineup, "defense");
+      // 相手のミスを奪うのは、外を守るガード（PG・SG・SF）。
+      const stealer = pickWeighted(playersAt(ms.lineup, PERIMETER_POS), "defense");
       addBox(stealer, "stl");
       addEvent(`${stealer.name} がスティール！`, "good");
     }
@@ -475,25 +534,48 @@ function simulatePossession(isHome) {
   }
 
   // --- シュート ---
+  // どこから打つかを、まず決める。
+  //   3P     … アウトサイドのガード・ウイングが打つ
+  //   インサイド … ゴール下。PF・Cが打ち、相手のリムの守りに直接止められる
+  //   ミドル/ドライブ … ガードが仕掛ける。ドリブル力が2Pの安定度を上げる
   const isThree = Math.random() < offTactic.three;
-  // 2Pは50%、3Pは35%が基準。そこから力の差で上下する。
-  const baseRate = isThree ? 0.35 : 0.50;
-  const rate = Math.min(0.75, Math.max(0.15, baseRate + diff * 0.004));
+  const rimD = rimProtection(defLineup);
+
+  let rate, points, scorer, kind;
+  if (isThree) {
+    // 3Pは水物。外の守りに少しだけ削られる。
+    rate = 0.35 + diff * 0.004 - (perimD - 50) * 0.0015;
+    points = 3;
+    kind = "three";
+    scorer = () => pickWeighted(playersAt(offLineup, PERIMETER_POS), ["shoot"]);
+  } else if (Math.random() < insideRatio(offLineup)) {
+    // インサイド。PF・Cのシュート力で沈める。相手のリムの守りがそのまま響く。
+    rate = 0.54 + diff * 0.004 - (rimD - 50) * 0.004;
+    points = 2;
+    kind = "inside";
+    scorer = () => pickWeighted(playersAt(offLineup, INSIDE_POS), ["shoot", "power"]);
+  } else {
+    // ミドル/ドライブ。ドリブル力が高いほど、2Pが安定する。
+    const driveStab = (teamRating(offLineup, { weights: { drive: 1 } }, offFatigue) - 50) * 0.002;
+    rate = 0.47 + diff * 0.004 + driveStab;
+    points = 2;
+    kind = "mid";
+    scorer = () => pickWeighted(offLineup, offTactic.scorer);
+  }
+  rate = Math.min(0.75, Math.max(0.12, rate));
 
   if (Math.random() < rate) {
-    const points = isThree ? 3 : 2;
     if (isHome) {
       ms.homeScore += points;
-      // 3Pはシュート力、2Pは戦術によって「決める人」が変わる
-      const scorer = pickWeighted(ms.lineup, isThree ? ["shoot", "tech"] : offTactic.scorer);
-      addBox(scorer, "pts", points);
+      const who = scorer();
+      addBox(who, "pts", points);
       // 6割はアシストが付く。パスの上手い選手が記録を伸ばす。
-      const others = ms.lineup.filter(p => p !== scorer);
+      const others = ms.lineup.filter(p => p !== who);
       if (others.length && Math.random() < 0.6) {
         const passer = pickWeighted(others, "pass");
         addBox(passer, "ast");
       }
-      if (isThree) addEvent(`${scorer.name} の3P！`, "good");
+      if (kind === "three") addEvent(`${who.name} の3P！`, "good");
     } else {
       ms.awayScore += points;
     }
@@ -510,6 +592,15 @@ function simulatePossession(isHome) {
     if (isHome) {
       const rebounder = pickWeighted(ms.lineup, "rebound");
       addBox(rebounder, "reb");
+      // 大きい選手が拾ったら、その場でねじ込むことがある（プットバック）。
+      // インサイドのシュート力が高いほど、押し込める。
+      if (INSIDE_POS.includes(rebounder.pos)
+          && Math.random() < 0.25 + (getStat(rebounder, "shoot") - 40) * 0.004) {
+        ms.homeScore += 2;
+        addBox(rebounder, "pts", 2);
+        addEvent(`${rebounder.name} が押し込んだ！`, "good");
+        return;
+      }
       addEvent(`${rebounder.name} がオフェンスリバウンド`, "");
     }
     simulatePossession(isHome); // 攻撃続行
@@ -545,6 +636,12 @@ function simulateQuarter() {
   // 延長は5分。通常のクォーター（10分）の半分。
   if (isOvertime()) pace = Math.round(pace / 2);
 
+  // 作戦タイムで選んだことを、このクオーターの実況の頭に置く
+  if (ms.qChoiceResult) {
+    addEvent(ms.qChoiceResult, "choice");
+    ms.qChoiceResult = null;
+  }
+
   for (let i = 0; i < pace; i++) {
     simulatePossession(true);
     simulatePossession(false);
@@ -575,6 +672,7 @@ function simulateQuarter() {
   const awayLoad = (OFF_TACTICS[opp.off].load + DEF_TACTICS[opp.def].load) / 2 * otMult;
   ms.awayFatigue = Math.min(100, ms.awayFatigue + 9 * awayLoad * (1.3 - opp.base.stamina / 200));
 
+  ms.qBuff = null; // このクオーターぶんのバフは使い切り
   ms.quarter++;
 
   // 相手は次のクォーターで戦術を変えてくることがある
@@ -716,6 +814,9 @@ function startMatch(opponent, tournament = null) {
   ms.skillReport = null;
   // 切り札は1試合につき、攻撃・守備それぞれ1Qだけ
   ms.trumpUsed = { off: false, def: false };
+  ms.subView = null; // 交代・作戦の画面を開いているか
+  ms.qBuff = null;
+  ms.qChoiceResult = null;
 
   // 通常戦術に戻す（前の試合で切り札を選んだまま持ち越さない）
   if (isTrump(OFF_TACTICS, ms.offTactic)) ms.offTactic = "MOTION";
@@ -1030,60 +1131,110 @@ function renderPlaying() {
       </div>
     </div>
 
-    ${finished ? renderResult() + skills : `
-      <div class="tactic-box">
-        <div class="tactic-row">
-          <label>攻撃</label>${tacticSelect("off-tactic", availableTactics(OFF_TACTICS), ms.offTactic)}
-          <span class="tactic-desc">${OFF_TACTICS[ms.offTactic].desc}</span>
-        </div>
-        <div class="tactic-row">
-          <label>守備</label>${tacticSelect("def-tactic", availableTactics(DEF_TACTICS), ms.defTactic)}
-          <span class="tactic-desc">${DEF_TACTICS[ms.defTactic].desc}</span>
-        </div>
-        <div class="scout">
-          <div>相手の戦術: <b>${OFF_TACTICS[opp.off].name}</b> / <b>${DEF_TACTICS[opp.def].name}</b></div>
-          <div class="scout-stats">
-            ${DERIVED_STATS.map(s => {
-              const value = calcDerived(opp, s);
-              return `<span class="scout-stat" title="${opp.name}の${s.label}">
-                ${s.label} <b class="${value >= 65 ? "hi" : ""}">${value}</b>
-              </span>`;
-            }).join("")}
-          </div>
-          ${renderTrumpStatus()}
-        </div>
-      </div>
+    ${finished ? renderResult() + skills
+      : ms.subView === "sub" ? renderSubPanel(bench)
+      : ms.subView === "tactics" ? renderTacticsPanel()
+      : renderMatchControls(canPlay, tied)}
 
-      <button class="next-btn ${tied ? "cup-btn" : ""}" id="play-q" ${canPlay ? "" : "disabled"}>
-        ${!canPlay ? "メンバーを5人にしてください"
-          : tied ? `▶ ${quarterLabel(ms.quarter)}を戦う（5分）`
-          : `▶ ${quarterLabel(ms.quarter)}を戦う`}
-      </button>`}
-
-    <div class="match-cols">
-      <div class="lineup-col">
-        <div class="section-label">
-          コート上 <span class="section-note">${ms.lineup.length}/5 ・ 数字は疲労を反映した今の能力</span>
+    ${ms.subView ? "" : `
+      <div class="match-cols">
+        <div>
+          <div class="section-label">個人成績</div>
+          <table class="box-table">
+            <tr><th>選手</th><th>出場</th><th>得点</th><th>R</th><th>A</th><th>S</th></tr>
+            ${box || `<tr><td colspan="6" class="cond-note">まだ試合が始まっていない</td></tr>`}
+          </table>
         </div>
-        ${lineupHeader()}
-        ${ms.lineup.map(p => playerRow(p, true)).join("")}
-        <div class="section-label">ベンチ</div>
-        ${bench.map(p => playerRow(p, false)).join("") || `<div class="cond-note">控えなし</div>`}
-      </div>
-      <div>
-        <div class="section-label">個人成績</div>
-        <table class="box-table">
-          <tr><th>選手</th><th>出場</th><th>得点</th><th>R</th><th>A</th><th>S</th></tr>
-          ${box || `<tr><td colspan="6" class="cond-note">まだ試合が始まっていない</td></tr>`}
-        </table>
-        <div class="section-label">経過</div>
-        <div class="events">${events || `<div class="cond-note">—</div>`}</div>
-      </div>
-    </div>
+        <div>
+          <div class="section-label">経過</div>
+          <div class="events">${events || `<div class="cond-note">—</div>`}</div>
+        </div>
+      </div>`}
 
     ${exp}
 
     ${finished ? renderDoneButton() : ""}`;
+}
+
+// 試合中の操作。ふだんはこれ。作戦の要約と、交代・作戦を開くボタンだけ。
+// メンバー表と作戦の中身は、ボタンの裏（subView）に隠して画面を軽くする。
+function renderMatchControls(canPlay, tied) {
+  const ms = matchState;
+  const opp = ms.opponent;
+  const off = OFF_TACTICS[ms.offTactic];
+  const def = DEF_TACTICS[ms.defTactic];
+
+  return `
+    <div class="ctrl-box">
+      <div class="ctrl-tactics">
+        <div><span class="ctrl-label">攻撃</span> ${off.name}${off.locked ? "（切り札）" : ""}</div>
+        <div><span class="ctrl-label">守備</span> ${def.name}${def.locked ? "（切り札）" : ""}</div>
+      </div>
+
+      <div class="scout">
+        <div>相手の戦術: <b>${OFF_TACTICS[opp.off].name}</b> / <b>${DEF_TACTICS[opp.def].name}</b></div>
+        <div class="scout-stats">
+          ${DERIVED_STATS.map(s => {
+            const value = calcDerived(opp, s);
+            return `<span class="scout-stat" title="${opp.name}の${s.label}">
+              ${s.label} <b class="${value >= 65 ? "hi" : ""}">${value}</b>
+            </span>`;
+          }).join("")}
+        </div>
+        ${renderTrumpStatus()}
+      </div>
+
+      <div class="ctrl-menu">
+        <button class="match-menu-btn" id="open-sub">🔄 交代</button>
+        <button class="match-menu-btn" id="open-tactics">📋 作戦変更</button>
+      </div>
+    </div>
+
+    <button class="next-btn ${tied ? "cup-btn" : ""}" id="play-q" ${canPlay ? "" : "disabled"}>
+      ${!canPlay ? "メンバーを5人にしてください"
+        : tied ? `▶ ${quarterLabel(ms.quarter)}を戦う（5分）`
+        : `▶ ${quarterLabel(ms.quarter)}を戦う`}
+    </button>`;
+}
+
+// 交代の画面。ここだけを大きく出す。横に長い表も、この中で完結する。
+function renderSubPanel(bench) {
+  const ms = matchState;
+  return `
+    <div class="sub-panel-head">
+      <button class="back-btn" id="close-subview">← 試合に戻る</button>
+      <span class="sub-panel-title">🔄 交代</span>
+    </div>
+    <div class="lineup-col">
+      <div class="section-label">
+        コート上 <span class="section-note">${ms.lineup.length}/5 ・ 数字は疲労を反映した今の能力</span>
+      </div>
+      ${lineupHeader()}
+      ${ms.lineup.map(p => playerRow(p, true)).join("")}
+      <div class="section-label">ベンチ</div>
+      ${bench.map(p => playerRow(p, false)).join("") || `<div class="cond-note">控えなし</div>`}
+    </div>`;
+}
+
+// 作戦変更の画面。攻め・守りのドロップダウンだけを大きく出す。
+function renderTacticsPanel() {
+  const ms = matchState;
+  return `
+    <div class="sub-panel-head">
+      <button class="back-btn" id="close-subview">← 試合に戻る</button>
+      <span class="sub-panel-title">📋 作戦変更</span>
+    </div>
+    <div class="tactic-box">
+      <div class="tactic-row">
+        <label>攻撃</label>${tacticSelect("off-tactic", availableTactics(OFF_TACTICS), ms.offTactic)}
+        <span class="tactic-desc">${OFF_TACTICS[ms.offTactic].desc}</span>
+      </div>
+      <div class="tactic-row">
+        <label>守備</label>${tacticSelect("def-tactic", availableTactics(DEF_TACTICS), ms.defTactic)}
+        <span class="tactic-desc">${DEF_TACTICS[ms.defTactic].desc}</span>
+      </div>
+      ${renderTrumpStatus()}
+    </div>`;
 }
 
 // 試合が終わったときの見出し。大会かどうかで意味が変わる。
@@ -1178,6 +1329,14 @@ function renderMatch() {
   panel.querySelectorAll("[data-swap]").forEach(btn => {
     btn.addEventListener("click", () => onSwap(btn.dataset.swap));
   });
+
+  // 試合メニュー：交代・作戦を開く／閉じる
+  const openSub = document.getElementById("open-sub");
+  if (openSub) openSub.addEventListener("click", () => { matchState.subView = "sub"; renderMatch(); });
+  const openTac = document.getElementById("open-tactics");
+  if (openTac) openTac.addEventListener("click", () => { matchState.subView = "tactics"; renderMatch(); });
+  const closeSub = document.getElementById("close-subview");
+  if (closeSub) closeSub.addEventListener("click", () => { matchState.subView = null; renderMatch(); });
 }
 
 
@@ -1197,6 +1356,84 @@ function onSwap(name) {
     return; // すでに5人。誰かを下げてから
   }
   renderMatch();
+}
+
+// クオーター間の選択。
+//
+// 効果は次の1Qだけの、ごく小さいもの（±1.5程度）。勝敗は決めない。
+// 「監督として、流れを自分で作っている」感覚のためのもの。
+// 状況（リード／ビハインド）で、監督の言葉が変わる。
+function quarterChoiceSet() {
+  const ms = matchState;
+  const lead = ms.homeScore - ms.awayScore;
+  const nextQ = quarterLabel(ms.quarter);
+
+  let text;
+  if (lead >= 8) {
+    text = `${nextQ}へ。リードしている。ここで気を抜くと、こういうのは一気にひっくり返る。`;
+  } else if (lead <= -8) {
+    text = `${nextQ}へ。離されている。まだ終わっていない。どう仕掛ける。`;
+  } else {
+    text = `${nextQ}へ。競っている。この1本ずつが、そのまま勝敗になる。`;
+  }
+
+  return {
+    text,
+    options: [
+      {
+        label: "円陣を組んで、気合を入れ直す",
+        qBuff: { off: 1.5, def: 0, calm: 0 },
+        result: lead <= -8
+          ? "「まだいける」と赤星が言った。声が、少し大きかった。"
+          : "全員で手を重ねた。次のプレーの入りが、たぶん変わる。",
+      },
+      {
+        label: "守備を締めろ、と指示する",
+        qBuff: { off: 0, def: 1.5, calm: 0 },
+        result: "「一本ずつ、確実に止めろ」。ベンチの声が、コートに届いた。",
+      },
+      {
+        label: "落ち着いていこう、と声をかける",
+        qBuff: { off: 0, def: 0, calm: 0.04 },
+        result: "深呼吸ひとつ。慌てなければ、ミスは減る。",
+      },
+      {
+        label: "何も言わず、送り出す",
+        qBuff: { off: 0, def: 0, calm: 0 },
+        result: "監督は、黙って頷いた。信じている、ということだ。",
+      },
+    ],
+  };
+}
+
+// クオーター間の選択を出す。選ぶまで次に進めない。
+function openQuarterChoice() {
+  const set = quarterChoiceSet();
+  const panel = document.getElementById("qchoice-panel");
+
+  panel.innerHTML = `
+    <div class="qchoice-head">
+      <span class="qchoice-tag">作戦タイム</span>
+      <span class="qchoice-score">${matchState.homeScore} - ${matchState.awayScore}</span>
+    </div>
+    <div class="story-text qchoice-text">${set.text}</div>
+    <div class="choice-options">
+      ${set.options.map((o, i) => `
+        <button class="choice-btn qchoice-btn" data-q="${i}">${o.label}</button>`).join("")}
+    </div>`;
+
+  panel.querySelectorAll("[data-q]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const opt = set.options[Number(btn.dataset.q)];
+      matchState.qBuff = opt.qBuff;
+      // 選んだ結果を、次のクオーターの実況の頭に置く
+      matchState.qChoiceResult = opt.result;
+      document.getElementById("qchoice-overlay").classList.add("hidden");
+      renderMatch();
+    });
+  });
+
+  document.getElementById("qchoice-overlay").classList.remove("hidden");
 }
 
 function onPlayQuarter() {
@@ -1219,11 +1456,15 @@ function onPlayQuarter() {
   }
 
   // 同点のままでは終われない。バスケに引き分けはないので延長戦へ。
-  // ここを「4Q終わったら終了」にしていたせいで、
-  // 83-83 の決勝が敗戦として記録されていた。
   const decided = ms.homeScore !== ms.awayScore;
-  if (ms.quarter >= 4 && decided) finishMatch();
-  else renderMatch();
+  if (ms.quarter >= 4) {
+    if (decided) finishMatch();
+    else renderMatch(); // 延長へ。作戦タイムは挟まない。
+    return;
+  }
+
+  // 第1〜3Qの後は、次のQへ向けて作戦タイム（選択）を挟む。
+  openQuarterChoice();
 }
 
 

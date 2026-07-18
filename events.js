@@ -425,7 +425,6 @@ const STORY = [
           ── 赤星 蓮 が「牙」を習得した`,
         // 話が形になったら、それを技能として残す。
         // 文章だけで終わらせず、試合の数字に効かせる。
-        effect: () => giveHeroSkill("FANG"),
       },
       {
         when: () => heroStyle() === "general" && heroRank() <= 2,
@@ -441,7 +440,6 @@ const STORY = [
           緑川は少し黙って、それから小さく「そうか」とだけ言って、また口を閉じた。この男が二往復も喋ったのは、たぶん今年で、数えるほどしかない。
           
           ── 赤星 蓮 が「司令塔」を習得した`,
-        effect: () => giveHeroSkill("GENERAL"),
       },
       {
         when: () => true,
@@ -693,6 +691,7 @@ const CHOICES = [
           h.base.tech = Math.min(100, h.base.tech + 5);
           h.base.speed = Math.min(100, h.base.speed + 3);
           h.growth.tech = Math.min(1.5, h.growth.tech + 0.1);
+          giveHeroSkill("FANG"); // 選んだ道が、そのまま技能になる
           return `「お前が決めろ」と監督は言った。
             赤星は頷いた。断らなかったことが、答えだった。`;
         },
@@ -708,6 +707,7 @@ const CHOICES = [
           for (const p of players) {
             if (p !== h) p.base.iq = Math.min(100, p.base.iq + 1);
           }
+          giveHeroSkill("GENERAL"); // 選んだ道が、そのまま技能になる
           return `「お前が全員を活かせ」と監督は言った。
             赤星は少しだけ考えて、頷いた。`;
         },
@@ -734,7 +734,7 @@ function getChoice(week) {
 // 引数の call は呼び方（ふつうは「◯◯くん」、灰谷だけ「ゆうちゃん」）。
 const SKILLS = {
   CLUTCH: {
-    name: "勝負強さ", icon: "🔥",
+    name: "勝負強さ", icon: "🔥", tier: "heavy",
     desc: "第4Qに化ける。終盤の得点力とシュート精度が上がる。",
     clutch: true,
     episode: call => `第4Qになると、${call}の顔つきが、ぐにゃっと変わるんです。
@@ -742,34 +742,34 @@ const SKILLS = {
       「あ、スイッチ入った」って。あれが入った日は、たいてい勝ちます。`,
   },
   REBOUNDER: {
-    name: "リバウンド職人", icon: "💪",
+    name: "リバウンド職人", icon: "💪", tier: "heavy",
     desc: "リバウンドへの嗅覚。ボールが手元に落ちてくる。",
-    stat: { rebound: 4 },
-    pickMult: { rebound: 2.0 },
+    stat: { rebound: 3 },
+    pickMult: { rebound: 1.7 },
     episode: call => `どこに落ちてくるか、分かるらしいです。
       「見えるから」って${call}は言うんですけど、普通は見えないですよ、あんなの。
       ボールのほうが、${call}の手を選んで落ちてきてる気さえします。`,
   },
   STEALER: {
-    name: "読みの鋭さ", icon: "👁",
+    name: "読みの鋭さ", icon: "👁", tier: "heavy",
     desc: "パスコースを読む。スティールが増える。",
-    stat: { defense: 4 },
-    pickMult: { defense: 2.0 },
+    stat: { defense: 3 },
+    pickMult: { defense: 1.7 },
     episode: call => `練習中も、先輩のパスを平気でカットするので、よく怒られてます。
       ${call}、悪気はないんです。見えちゃうだけなんです。
       「取るなよ、味方のを」って言われて、キョトンとしてました。区別、ついてないのかもしれません。`,
   },
   SHOOTER: {
-    name: "3Pの申し子", icon: "🎯",
+    name: "3Pの申し子", icon: "🎯", tier: "heavy",
     desc: "外から沈める。シュート力が跳ね上がる。",
-    stat: { shoot: 7 },
-    pickMult: { shoot: 1.6 },
+    stat: { shoot: 6 },
+    pickMult: { shoot: 1.5 },
     episode: call => `「手を離れた瞬間に、入るのが分かる」って言うんです。
       嘘でしょって思ったんですけど、${call}の場合、本当に入るんですよね。
       だから、たまに外したときの「あれ?」って顔が、ちょっと面白いです。`,
   },
   TOUGH: {
-    name: "タフガイ", icon: "🛡",
+    name: "タフガイ", icon: "🛡", tier: "heavy",
     desc: "試合中に消耗しにくい。40分走り切れる。",
     stat: { stamina: 4 },
     fatigueMult: 0.7,
@@ -777,10 +777,10 @@ const SKILLS = {
       ${call}の体、どうなってるんでしょう。エンジン、二つ積んでるのかもしれません。`,
   },
   GENERAL: {
-    name: "司令塔", icon: "🧠",
+    name: "司令塔", icon: "🧠", tier: "heavy",
     desc: "コート上の監督。パスと判断が一段上がる。",
-    stat: { pass: 6, iq: 4 },
-    pickMult: { pass: 1.6 },
+    stat: { pass: 5, iq: 3 },
+    pickMult: { pass: 1.5 },
     episode: call => `監督が指示を出す前に、${call}が、もう同じことを言ってます。
       コートの上に、監督がもう一人いるみたいです。おかげで監督、最近ちょっと暇そうです。`,
   },
@@ -799,6 +799,40 @@ const SKILLS = {
       本人も、見られることを、嫌がらなくなりました。むしろ、待ってる節すらあります。
       ……変わったなあ、と思います。頼られるのって、重いはずなのに。`,
   },
+
+  // --- ここから下は「軽い技能」。効果は小さいが、よく手に入る。 ---
+  // 重い技能が「試合を変える」なら、軽い技能は「少し後押しする」くらい。
+  // 試合能力の計算に、そのまま数ポイント足すだけ。
+  MOOD: {
+    name: "ムードメーカー", icon: "😄", tier: "light",
+    desc: "コートにいると、味方の空気が軽くなる。全員が少しだけ伸びる。",
+    mood: 1.5, // コート上にいる間、チーム全体の評価に上乗せ
+    episode: call => `${call}がコートにいると、なんだかベンチまで明るいんです。
+      プレーがどう、っていうより、いるだけで、みんなの肩の力が抜けるみたいで。
+      ……ああいうの、才能だと思います。数字には出ませんけど。`,
+  },
+  STOPPER: {
+    name: "堅い守り", icon: "🧱", tier: "light",
+    desc: "地味に、確実に止める。ディフェンス力が少し上がる。",
+    stat: { defense: 4 },
+    episode: call => `派手さはないんですけど、${call}が付いた相手、点が伸びないんですよ。
+      本人は「普通にやってるだけ」って言います。その普通が、難しいんですけどね。`,
+  },
+  SPARK: {
+    name: "勝負どころ", icon: "✨", tier: "light",
+    desc: "ここぞで沈める。シュート力が少し上がる。",
+    stat: { shoot: 4 },
+    episode: call => `いつも入るわけじゃないんです。でも、入ってほしい場面で、${call}は入れる。
+      不思議ですよね。練習だと半分くらいなのに、試合の大事なところだけ、なぜか入るんです。`,
+  },
+  ENGINE: {
+    name: "止まらない脚", icon: "💨", tier: "light",
+    desc: "走り続けられる。スピードが上がり、少し疲れにくい。",
+    stat: { speed: 4 },
+    fatigueMult: 0.88,
+    episode: call => `${call}、後半になっても脚が落ちないんです。
+      むしろ相手が止まってくる時間帯に、まだ走ってる。それだけで、けっこう怖いですよ。`,
+  },
 };
 
 function hasSkill(unit, key) {
@@ -814,38 +848,40 @@ function hasSkill(unit, key) {
 //
 // 条件を満たしても確実には身につかない。練習試合で10%、公式戦で20%。
 // 公式戦のほうが高いのは、緊張感の中で掴んだものは残るから。
+// pos … その技能を掴めるポジション（無ければ誰でも）
+// tier は SKILLS 側で定義済み。light は掴みやすく、heavy は渋い。
 const MATCH_SKILLS = [
+  // ---- 重い技能：ポジションに合った選手だけ、渋く掴む ----
   {
-    key: "SHOOTER",
+    key: "SHOOTER", pos: ["PG", "SG", "SF"],
     need: box => box.pts >= 20,
-    label: "1試合20点以上",
+    label: "1試合20点以上（アウトサイド）",
     story: name => `「今日、なんか入る気しかしなかったです」と${name}は言いました。
       ああいう日を1回経験すると、人は変わるみたいです。`,
   },
   {
-    key: "REBOUNDER",
+    key: "REBOUNDER", pos: ["PF", "C"],
     need: box => box.reb >= 10,
-    label: "1試合10リバウンド以上",
+    label: "1試合10リバウンド以上（インサイド）",
     story: name => `10本です。10本。ずっと同じ場所に立ってただけみたいな顔してましたけど。
       ${name}、たぶん見えてます。`,
   },
   {
-    key: "GENERAL",
+    key: "GENERAL", pos: ["PG", "SG"],
     need: box => box.ast >= 8,
-    label: "1試合8アシスト以上",
+    label: "1試合8アシスト以上（ガード）",
     story: name => `${name}のパスで点が入り続けた試合でした。
       あれ、味方が上手くなったんじゃなくて、${name}が上手くなったんだと思います。`,
   },
   {
-    key: "STEALER",
+    key: "STEALER", pos: ["PG", "SG", "SF"],
     need: box => box.stl >= 4,
-    label: "1試合4スティール以上",
+    label: "1試合4スティール以上（アウトサイド）",
     story: name => `相手のパス、4本も切りました。読んでるとしか思えません。
       ${name}は「なんとなく」って言うんですけど。`,
   },
   {
-    key: "CLUTCH",
-    // 接戦を勝ち切った試合で、フル出場して点を取った選手
+    key: "CLUTCH", // どのポジションでも
     need: (box, ctx) => ctx.win && ctx.margin <= 5 && box.min >= 4 && box.pts >= 12,
     label: "5点差以内の勝利で、フル出場かつ12点以上",
     story: name => `最後の最後、全部${name}のところにボールが行きました。
@@ -853,13 +889,36 @@ const MATCH_SKILLS = [
   },
   {
     key: "TOUGH",
-    // 疲れ切ってもフル出場し続けた選手。
-    // 万全で入った試合ではまず届かない（4Qでだいたい疲労65前後）。
-    // 大会の連戦や、疲れたまま組んだ練習試合でだけ起きる。
     need: (box, ctx) => box.min >= 4 && ctx.endFatigue >= 70,
     label: "疲労70以上でフル出場",
     story: name => `もう足が止まってるのに、最後まで下がりませんでした。
       ${name}、次の日けろっとしてました。どうなってるんでしょう。`,
+  },
+
+  // ---- 軽い技能：条件が緩く、よく手に入る ----
+  {
+    key: "MOOD",
+    need: (box, ctx) => ctx.win && box.min >= 2, // 勝った試合に出ていれば
+    label: "出場した試合に勝つ",
+    story: name => `${name}が出た試合、なんか良い雰囲気だったんですよね。`,
+  },
+  {
+    key: "STOPPER", pos: ["PG", "SG", "SF", "PF", "C"],
+    need: box => box.stl >= 2 || box.reb >= 6, // 守りで何かしていれば
+    label: "1試合2スティール または 6リバウンド",
+    story: name => `${name}、地味に止めてました。スタッツには出にくいですけど。`,
+  },
+  {
+    key: "SPARK", pos: ["PG", "SG", "SF"],
+    need: box => box.pts >= 12, // シューターより緩い
+    label: "1試合12点以上",
+    story: name => `${name}、大事なところで1本沈めてました。ああいうの、大きいです。`,
+  },
+  {
+    key: "ENGINE",
+    need: (box, ctx) => box.min >= 4 && ctx.endFatigue >= 55, // タフガイより緩い
+    label: "そこそこ疲れてもフル出場",
+    story: name => `${name}、後半もよく走ってました。脚、残ってましたね。`,
   },
 ];
 
@@ -869,11 +928,18 @@ function rollMatchSkills(player, box, ctx) {
   // 1人が1試合で覚えるのは1つまで。まとめて生えると安っぽくなる。
   if (player.skills.length >= 3) return null;
 
-  const chance = ctx.official ? 0.20 : 0.10;
-
   for (const entry of MATCH_SKILLS) {
     if (player.skills.includes(entry.key)) continue;
+    // ポジションが合わない技能は掴めない。
+    // センターが3Pの申し子、ガードがリバウンド職人、を防ぐ。
+    if (entry.pos && !entry.pos.includes(player.pos)) continue;
     if (!entry.need(box, ctx)) continue;
+
+    // 軽い技能はよく手に入り、重い技能は渋い。
+    const light = SKILLS[entry.key].tier === "light";
+    const chance = light
+      ? (ctx.official ? 0.35 : 0.22)
+      : (ctx.official ? 0.20 : 0.10);
     if (Math.random() >= chance) continue;
 
     player.skills.push(entry.key);
