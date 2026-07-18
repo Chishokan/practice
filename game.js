@@ -827,11 +827,12 @@ function renderRoster() {
       // 成長率が高い項目に印をつける。育成方針を決める手がかりになる。
       const mark = rate >= 1.3 ? "◎" : rate >= 1.1 ? "○" : rate <= 0.8 ? "▲" : "";
       return `
-        <div class="stat" title="成長率 ${rate.toFixed(1)} — ${s.desc}">
+        <div class="stat has-rank" title="成長率 ${rate.toFixed(1)} — ${s.desc}">
           <span class="stat-name">${s.label}<span class="growth-mark">${mark}</span></span>
           <div class="stat-track">
             <div class="stat-fill" style="width:${value}%"></div>
           </div>
+          ${rankBadge(value, `${s.label} ${value}`)}
           <span class="stat-value ${gained ? "gained" : ""}">${value}</span>
         </div>`;
     }).join("");
@@ -841,11 +842,12 @@ function renderRoster() {
       const value = derived[d.key];
       const gained = lastGained[player.name]?.derivedGains?.[d.key];
       return `
-        <div class="stat" title="${d.label} = ${describeFormula(d)}">
+        <div class="stat has-rank" title="${d.label} = ${describeFormula(d)}">
           <span class="stat-name">${d.label}</span>
           <div class="stat-track">
             <div class="stat-fill derived" style="width:${value}%"></div>
           </div>
+          ${rankBadge(value, `${d.label} ${value}`)}
           <span class="stat-value ${gained ? "gained" : ""}">${value}</span>
         </div>`;
     }).join("");

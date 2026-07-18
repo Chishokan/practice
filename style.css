@@ -1019,6 +1019,10 @@ button, select { -webkit-tap-highlight-color: transparent; }
   cursor: help;
 }
 
+/* F〜S の評価を出す行は、バーと数値の間に評価列を1つ足す */
+.stat.has-rank { grid-template-columns: 78px 1fr 22px 30px; }
+.stat .rank { min-width: 20px; height: 16px; font-size: 10px; padding: 0 3px; }
+
 .stat-name { color: var(--muted); }
 
 /* 成長率の印（◎○▲） */
