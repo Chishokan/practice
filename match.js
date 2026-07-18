@@ -793,8 +793,13 @@ function openMatch() {
 
 // 練習試合の誘いを、受けるか断るか尋ねる。
 // 受けたら、その場で練習試合を始める（closeMatch がその週を消費する）。
+//
+// 「二度出さない」フラグ（friendlyInviteDone）は、断ったときだけ立てる。
+// 受けて試合を終えた場合は state.history に friendly が残り、そちらで
+// 二度目を止められる（maybeFriendlyInvite の履歴チェック）。
+// こうしておけば、受けたあと試合を「閉じる」で中断しても、
+// 試合勘を養う機会そのものが永久に消えることはない（また誘いが来る）。
 function openFriendlyInvite(opponent, menuKey) {
-  state.friendlyInviteDone = true; // 一度出したら、受けても断っても二度は出さない
   const panel = document.getElementById("choice-panel");
 
   panel.innerHTML = `
@@ -824,6 +829,7 @@ function openFriendlyInvite(opponent, menuKey) {
     startMatch(opponent); // 練習試合。closeMatch がこの週を消費する
   });
   panel.querySelector('[data-inv="no"]').addEventListener("click", () => {
+    state.friendlyInviteDone = true; // 断ったので、もう誘いは出さない
     document.getElementById("choice-overlay").classList.add("hidden");
     onNextWeek(menuKey); // 断ったら、そのまま予定どおり週を進める
   });
@@ -844,6 +850,15 @@ function openTournament(tournament) {
 
 function closeMatch() {
   const ms = matchState;
+
+  // 進行中（まだ終わっていない）の試合を閉じる＝中断。
+  // 事故で試合が消えると困るので、一度だけ確認する。
+  if (ms.phase === "playing") {
+    const msg = ms.tournament
+      ? "試合を中断しますか？\nこの試合は最初からやり直しになります。"
+      : "練習試合を中断しますか？\nここまでの内容は残りません。";
+    if (typeof confirm === "function" && !confirm(msg)) return;
+  }
 
   // 大会が終わっていたら、その週を消費して次の週へ進む
   const wasWinter = ms.tournament?.key === "winter" && ms.tournamentEnd;
