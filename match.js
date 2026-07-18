@@ -661,8 +661,9 @@ function simulateSegment() {
     + OFF_TACTICS[ms.offTactic].pace + OFF_TACTICS[opp.off].pace
     + DEF_TACTICS[ms.defTactic].pace + DEF_TACTICS[opp.def].pace;
 
-  // 延長は1セグメントで完結（分割しない）。通常は半クオーターずつ。
-  pace = isOvertime() ? Math.round(pace / 2) : Math.round(pace / 2);
+  // 1セグメント＝半クオーター分のポゼッション。
+  // 通常クオーターは2セグメントで1つ、延長は1セグメントで完結（5分想定で短め）。
+  pace = Math.round(pace / 2);
 
   // アドバイスで選んだことを、このセグメントの実況の頭に置く
   if (ms.qChoiceResult) {
@@ -849,6 +850,7 @@ function closeMatch() {
     state.tournaments[ms.tournament.key] = ms.tournamentEnd;
     tickBuff();
     state.week++;
+    state.roster = rollRoster(); // 次の練習週は新しい顔ぶれで始める
     ms.tournament = null;
   } else if (!ms.tournament && ms.phase === "done") {
     // 練習試合も1週間を使う。試合をした週は練習できない。
@@ -858,6 +860,7 @@ function closeMatch() {
     // 試合を組むかどうかが選択になっていなかった。
     tickBuff();
     state.week++;
+    state.roster = rollRoster(); // 次の練習週は新しい顔ぶれで始める
     logFriendlyWeek();
   }
 
@@ -1299,6 +1302,9 @@ function renderMatchControls(canPlay, tied) {
         <button class="match-menu-btn" id="open-sub">🔄 交代</button>
         ${qBoundary ? `<button class="match-menu-btn" id="open-tactics">📋 作戦変更</button>` : ""}
         ${adviceAvail ? `<button class="match-menu-btn advice" id="open-advice">💬 アドバイス</button>` : ""}
+      </div>
+      <div class="ctrl-hint">
+        交代はいつでも／作戦変更はクオーターの変わり目だけ／アドバイスは前半・後半に1回ずつ
       </div>
     </div>
 

@@ -1907,7 +1907,7 @@ button, select { -webkit-tap-highlight-color: transparent; }
 .lineup-row .num.stat-hi { color: #6ee787; font-weight: bold; }
 .lineup-row .num.stat-lo { color: #6b7688; }
 
-.lineup-box { color: var(--muted); font-size: 10px; white-space: nowrap; }
+.lineup-box { color: var(--muted); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .swap-btn {
   width: 30px;
@@ -2512,7 +2512,7 @@ button, select { -webkit-tap-highlight-color: transparent; }
   /* メンバー表も横スクロール。
      ここは数字を削るより、スクロールさせたほうが判断できる。 */
   .lineup-col { overflow-x: auto; }
-  .lineup-row { min-width: 400px; }
+  .lineup-row { min-width: 420px; }
 
   /* 個人成績・戦歴の表 */
   .box-table { font-size: 10px; }
@@ -2794,9 +2794,17 @@ button, select { -webkit-tap-highlight-color: transparent; }
 
 .ctrl-menu {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   gap: 8px;
   margin-top: 10px;
+}
+
+/* 試合中の操作ルールの一行ガイド */
+.ctrl-hint {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+  margin-top: 8px;
 }
 
 .match-menu-btn {
@@ -2955,6 +2963,9 @@ button, select { -webkit-tap-highlight-color: transparent; }
   font-size: 12px;
   padding: 3px 7px;
   white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .oncourt-p b {
