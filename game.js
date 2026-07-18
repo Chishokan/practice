@@ -100,7 +100,7 @@ const POSITION_WEIGHTS = {
 //
 // 4月の時点では、全員が「まだ何者でもない」ようにしてある。
 // 初期の平均OVRは45前後。県大会1回戦の城東（Lv40）に、ようやく勝てるくらい。
-// 実測（大会2週前休養）: 県大会59% / ウィンターカップ24% / 全国0%。
+// 実測（大会2週前休養・1000回）: 県大会58% / ウィンターカップ27% / 全国0%。
 // 「1年かけて、ようやく届く」難易度に合わせてある。
 //
 // 以前は平均49.6で、開幕から県大会の全チームより上だった。
@@ -144,30 +144,36 @@ const players = [
   },
   {
     // 跳ぶ怪物。身体能力だけで、それ以外は何も無い。
-    // ジャンプ76は部内最高、バスケIQ22は部内最低。
+    // ジャンプ72は部内最高、パワー62も高く、バスケIQ16は部内最低。
+    // ジャンプとパワーが看板で、12月にはPFスタメンを確実に掴む。
+    // ゴール下ではこの跳躍力で押し込む「決め役」＝インサイド得点の主。
     // 伸びしろは全員の中で最大（ジャンプ成長率1.5）だが、
     // 頑丈さ0.6で、追い込むと真っ先にケガをする。
     // 緑川とは「跳ぶ／跳ばない」で正反対に作ってある。
     name: "白石 大河", pos: "PF", year: 1,
-    base:   { power: 52, speed: 40, stamina: 42, jump: 72, tech: 18, iq: 16 },
+    base:   { power: 62, speed: 40, stamina: 42, jump: 72, tech: 18, iq: 16 },
     growth: { power: 1.4, speed: 1.0, stamina: 1.2, jump: 1.5, tech: 0.9, iq: 0.7 },
     durable: 0.6,
   },
   {
     // 動かない壁。跳ばない。走れない。それでも誰も通れない。
-    // パワー76と読み（IQ54）で守るタイプで、白石とは正反対。
-    // スピード26は部内最低だが、頑丈さ1.3は部内最高。ケガをしない。
+    // パワー72と読み（IQ48）で守るタイプで、白石とは正反対。
+    // スピード20は部内最低だが、頑丈さ1.3は部内最高。ケガをしない。
+    // リバウンドとディフェンスは部内屈指。だがテク21で得点は伸びず（成長0.6）、
+    // ゴール下の決め役は白石に譲る「守る壁」＝得点は控えめ。
     // 伸びるのはIQ（1.3）。年を追うごとに「読む」センターになる。
     name: "緑川 壮真", pos: "C", year: 2,
-    base:   { power: 72, speed: 20, stamina: 52, jump: 46, tech: 26, iq: 48 },
-    growth: { power: 1.2, speed: 0.5, stamina: 1.1, jump: 0.8, tech: 0.7, iq: 1.3 },
+    base:   { power: 72, speed: 20, stamina: 52, jump: 46, tech: 21, iq: 48 },
+    growth: { power: 1.2, speed: 0.5, stamina: 1.1, jump: 0.8, tech: 0.6, iq: 1.3 },
     durable: 1.3,
   },
   {
     // 頭は良いが身体能力が足りない。控えPG。線が細い。
+    // IQ(成長1.2)と読みは伸びるが、身体系(スピード0.6/ジャンプ0.5)は伸びない。
+    // だから12月でもドライブ・ディフェンスが上がりきらず、白石(PF)の下に留まる。
     name: "紫藤 圭", pos: "PG", year: 1,
-    base:   { power: 24, speed: 40, stamina: 39, jump: 32, tech: 42, iq: 53 },
-    growth: { power: 0.8, speed: 1.0, stamina: 1.0, jump: 0.8, tech: 1.1, iq: 1.2 },
+    base:   { power: 24, speed: 35, stamina: 39, jump: 32, tech: 34, iq: 53 },
+    growth: { power: 0.8, speed: 0.6, stamina: 1.0, jump: 0.5, tech: 0.9, iq: 1.2 },
     durable: 0.9,
   },
   {
@@ -178,10 +184,11 @@ const players = [
     durable: 1.4,
   },
   {
-    // 目立たないが穴がない。守備要員。
+    // 目立たないが穴がない。守備要員。攻撃は伸びない（テク0.7）ので、
+    // 12月でもスタメン(白石PF)の一段下に留まる、堅実な控えSF。
     name: "灰谷 悠", pos: "SF", year: 2,
-    base:   { power: 42, speed: 44, stamina: 42, jump: 40, tech: 38, iq: 44 },
-    growth: { power: 1.0, speed: 0.9, stamina: 0.9, jump: 0.9, tech: 1.0, iq: 1.1 },
+    base:   { power: 42, speed: 44, stamina: 42, jump: 40, tech: 34, iq: 44 },
+    growth: { power: 1.0, speed: 0.7, stamina: 0.9, jump: 0.9, tech: 0.7, iq: 0.9 },
     durable: 1.0,
   },
 ];
@@ -1595,15 +1602,17 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("menu-load").addEventListener("click", fromDrawer(() => loadGame()));
   document.getElementById("menu-reset").addEventListener("click", fromDrawer(resetGame));
 
-  // 続きがあればそこから、なければ4月1週目の話から始める
+  // 続きがあればそこから、なければ4月1週目から始める。
+  // 第1話は起動時には出さず、4週目を終えた直後に出る（STORY の week:3）。
+  // まず1ヶ月ぶんプレイして部の空気に触れてから、始まりの回想として見せる。
   if (readSave()) {
     loadGame();
   } else {
     state.roster = rollRoster(); // 初週の顔ぶれ
-    lastStory = runStory();
+    lastStory = runStory();      // week0 に話は無いので実際は何も出ない（将来の保険）
     renderAll();
     renderSaveInfo();
-    showStoryModal(); // 第1話を読ませてから始める
+    showStoryModal();
   }
 
   previewEnding(); // ?ending=champion のときだけ動く（確認用）

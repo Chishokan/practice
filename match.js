@@ -200,7 +200,7 @@ const OFF_TACTICS = {
     desc: "人とボールを動かす。判断力の勝負。",
     weights: { pass: 0.40, shoot: 0.30, iq: 0.20, drive: 0.10 },
     scorer: ["shoot", "drive"],
-    three: 0.35,
+    three: 0.44,
     pace: 0, load: 1.0,
   },
 
@@ -475,7 +475,7 @@ function insideRatio(lineup) {
   const bigs = lineup.filter(p => p.pos && INSIDE_POS.includes(p.pos));
   if (!bigs.length) return 0.30;
   const power = bigs.reduce((s, p) => s + getStat(p, "rebound"), 0) / bigs.length;
-  return Math.max(0.25, Math.min(0.60, 0.20 + power / 250)); // リバウンド70で0.48
+  return Math.max(0.18, Math.min(0.50, 0.10 + power / 300)); // リバウンド70で0.33
 }
 
 // 個人成績を1つ足す
@@ -570,7 +570,7 @@ function simulatePossession(isHome) {
   let rate, points, scorer, kind;
   if (isThree) {
     // 3Pは水物。外の守りに少しだけ削られる。
-    rate = 0.35 + diff * 0.004 - (perimD - 50) * 0.0015;
+    rate = 0.39 + diff * 0.004 - (perimD - 50) * 0.0015;
     points = 3;
     kind = "three";
     scorer = () => pickWeighted(playersAt(offLineup, PERIMETER_POS), ["shoot"]);
@@ -579,7 +579,9 @@ function simulatePossession(isHome) {
     rate = 0.54 + diff * 0.004 - (rimD - 50) * 0.004;
     points = 2;
     kind = "inside";
-    scorer = () => pickWeighted(playersAt(offLineup, INSIDE_POS), ["shoot", "power"]);
+    // ゴール下を「決める」のは跳べる選手。白石(跳ぶ怪物)が押し込み、
+    // 緑川(動かない壁)は守り側で、得点はさほど伸ばさない。
+    scorer = () => pickWeighted(playersAt(offLineup, INSIDE_POS), ["shoot", "jump"]);
   } else {
     // ミドル/ドライブ。ドリブル力が高いほど、2Pが安定する。
     const driveStab = (teamRating(offLineup, { weights: { drive: 1 } }, offFatigue) - 50) * 0.002;
