@@ -1865,7 +1865,7 @@ button, select { -webkit-tap-highlight-color: transparent; }
 /* ポジション / 名前 / 疲労 / 試合能力5列 / 成績 / 交代ボタン */
 .lineup-row {
   display: grid;
-  grid-template-columns: 26px minmax(100px, 1fr) 40px repeat(5, 26px) 70px 24px;
+  grid-template-columns: 34px 26px minmax(92px, 1fr) 38px repeat(5, 24px) 62px;
   align-items: center;
   gap: 4px;
   border-radius: 6px;
@@ -1910,17 +1910,25 @@ button, select { -webkit-tap-highlight-color: transparent; }
 .lineup-box { color: var(--muted); font-size: 10px; white-space: nowrap; }
 
 .swap-btn {
-  background: none;
+  width: 30px;
+  background: #171b24;
   border: 1px solid var(--line);
   border-radius: 4px;
   color: var(--muted);
   cursor: pointer;
   font-family: inherit;
-  font-size: 10px;
-  padding: 2px 4px;
+  font-size: 12px;
+  padding: 4px 0;
+  text-align: center;
 }
 
 .swap-btn:hover { border-color: var(--accent); color: var(--text); }
+
+/* 下げる=赤み、出す=緑み。矢印だけで方向が分かるように。 */
+.swap-btn.out { color: #ff9f7a; }
+.swap-btn.in  { color: #6ee787; }
+
+.lineup-swap-head { font-size: 9px; text-align: center; }
 
 /* 個人成績表 */
 .box-table {
@@ -2852,3 +2860,110 @@ button, select { -webkit-tap-highlight-color: transparent; }
 
 /* 作戦タイムで選んだことは、実況で少し目立たせる */
 .ev.choice { color: #ffd166; }
+
+/* アドバイスのボタンは、交代・作戦とは色を分けて目立たせる */
+.match-menu-btn.advice { border-color: var(--accent); color: var(--accent); }
+
+
+/* ============================================
+   区切りの進行モーダル
+   ============================================ */
+
+.progress-panel { border-left: 3px solid #6ee787; }
+
+.progress-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.progress-tag {
+  background: #6ee787;
+  border-radius: 4px;
+  color: #08240f;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 3px 10px;
+}
+
+.progress-score {
+  margin-left: auto;
+  font-size: 22px;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-events {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.progress-events .ev {
+  background: var(--panel-2, rgba(255, 255, 255, 0.03));
+  border-radius: 6px;
+  border-left: 2px solid var(--line);
+  font-size: 14px;
+  padding: 8px 12px;
+}
+
+.progress-events .ev.good { border-left-color: #6ee787; }
+
+
+/* ============================================
+   出場選手（自校 / 相手）の表示
+   ============================================ */
+
+.oncourt {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+
+.oncourt-side {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  align-content: flex-start;
+}
+
+.oncourt-side.away { justify-content: flex-end; }
+
+.oncourt-team {
+  flex-basis: 100%;
+  font-size: 11px;
+  color: var(--muted, #9aa);
+  margin-bottom: 2px;
+}
+
+.oncourt-side.away .oncourt-team { text-align: right; }
+
+.oncourt-vs {
+  align-self: center;
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--muted, #9aa);
+}
+
+.oncourt-p {
+  background: var(--panel-2, rgba(255, 255, 255, 0.04));
+  border-radius: 5px;
+  font-size: 12px;
+  padding: 3px 7px;
+  white-space: nowrap;
+}
+
+.oncourt-p b {
+  color: var(--accent);
+  font-size: 10px;
+  margin-right: 2px;
+}
+
+.oncourt-p.washio {
+  background: rgba(110, 231, 135, 0.14);
+  border: 1px solid #6ee787;
+}

@@ -99,7 +99,9 @@ const POSITION_WEIGHTS = {
 // ---- 4. 部員データ -----------------------------------
 //
 // 4月の時点では、全員が「まだ何者でもない」ようにしてある。
-// 初期の平均OVRは45.8。県大会1回戦の城東（Lv38）に、ようやく勝てるくらい。
+// 初期の平均OVRは45前後。県大会1回戦の城東（Lv40）に、ようやく勝てるくらい。
+// 実測（大会2週前休養）: 県大会59% / ウィンターカップ24% / 全国0%。
+// 「1年かけて、ようやく届く」難易度に合わせてある。
 //
 // 以前は平均49.6で、開幕から県大会の全チームより上だった。
 // それだと「1年かけて強くなる」話にならない。
@@ -122,21 +124,21 @@ const players = [
   {
     // 走れて視野が広いが線が細い。パス型PG。体は強くない。
     name: "赤星 蓮", pos: "PG", year: 1,
-    base:   { power: 30, speed: 59, stamina: 52, jump: 42, tech: 54, iq: 61 },
+    base:   { power: 28, speed: 57, stamina: 50, jump: 40, tech: 52, iq: 59 },
     growth: { power: 0.7, speed: 1.3, stamina: 1.1, jump: 0.9, tech: 1.2, iq: 1.4 },
     durable: 0.8,
   },
   {
     // 手先が器用なシューター。守備は課題。
     name: "青木 樹", pos: "SG", year: 2,
-    base:   { power: 36, speed: 44, stamina: 40, jump: 47, tech: 66, iq: 42 },
+    base:   { power: 34, speed: 42, stamina: 38, jump: 45, tech: 64, iq: 40 },
     growth: { power: 0.9, speed: 0.9, stamina: 0.8, jump: 1.0, tech: 1.4, iq: 1.0 },
     durable: 1.0,
   },
   {
     // 全部そこそこ。伸びしろも平均的な万能型。頑丈さが取り柄。
     name: "黒田 迅", pos: "SF", year: 2,
-    base:   { power: 48, speed: 50, stamina: 54, jump: 48, tech: 46, iq: 48 },
+    base:   { power: 46, speed: 48, stamina: 52, jump: 46, tech: 44, iq: 46 },
     growth: { power: 1.1, speed: 1.0, stamina: 1.2, jump: 1.0, tech: 1.0, iq: 1.1 },
     durable: 1.3,
   },
@@ -147,7 +149,7 @@ const players = [
     // 頑丈さ0.6で、追い込むと真っ先にケガをする。
     // 緑川とは「跳ぶ／跳ばない」で正反対に作ってある。
     name: "白石 大河", pos: "PF", year: 1,
-    base:   { power: 54, speed: 42, stamina: 44, jump: 74, tech: 20, iq: 18 },
+    base:   { power: 52, speed: 40, stamina: 42, jump: 72, tech: 18, iq: 16 },
     growth: { power: 1.4, speed: 1.0, stamina: 1.2, jump: 1.5, tech: 0.9, iq: 0.7 },
     durable: 0.6,
   },
@@ -157,28 +159,28 @@ const players = [
     // スピード26は部内最低だが、頑丈さ1.3は部内最高。ケガをしない。
     // 伸びるのはIQ（1.3）。年を追うごとに「読む」センターになる。
     name: "緑川 壮真", pos: "C", year: 2,
-    base:   { power: 74, speed: 22, stamina: 54, jump: 48, tech: 28, iq: 50 },
+    base:   { power: 72, speed: 20, stamina: 52, jump: 46, tech: 26, iq: 48 },
     growth: { power: 1.2, speed: 0.5, stamina: 1.1, jump: 0.8, tech: 0.7, iq: 1.3 },
     durable: 1.3,
   },
   {
     // 頭は良いが身体能力が足りない。控えPG。線が細い。
     name: "紫藤 圭", pos: "PG", year: 1,
-    base:   { power: 26, speed: 42, stamina: 41, jump: 34, tech: 44, iq: 55 },
+    base:   { power: 24, speed: 40, stamina: 39, jump: 32, tech: 42, iq: 53 },
     growth: { power: 0.8, speed: 1.0, stamina: 1.0, jump: 0.8, tech: 1.1, iq: 1.2 },
     durable: 0.9,
   },
   {
     // 無尽蔵のスタミナ。走り勝つタイプ。いくら走らせても平気。
     name: "桃井 隼", pos: "SG", year: 1,
-    base:   { power: 38, speed: 55, stamina: 68, jump: 44, tech: 35, iq: 33 },
+    base:   { power: 36, speed: 53, stamina: 66, jump: 42, tech: 33, iq: 31 },
     growth: { power: 1.0, speed: 1.2, stamina: 1.4, jump: 1.0, tech: 0.9, iq: 0.9 },
     durable: 1.4,
   },
   {
     // 目立たないが穴がない。守備要員。
     name: "灰谷 悠", pos: "SF", year: 2,
-    base:   { power: 44, speed: 46, stamina: 44, jump: 42, tech: 40, iq: 46 },
+    base:   { power: 42, speed: 44, stamina: 42, jump: 40, tech: 38, iq: 44 },
     growth: { power: 1.0, speed: 0.9, stamina: 0.9, jump: 0.9, tech: 1.0, iq: 1.1 },
     durable: 1.0,
   },
@@ -447,6 +449,7 @@ const state = {
   subs: {},        // サブイベントの進行 { key: 進んだ段数 }
   subLast: {},     // 各サブイベントが最後に進んだ週 { key: 週 }
   quitter: null,   // 退部した部員（冬に効いてくる）
+  friendlyInviteDone: false, // 練習試合の誘いを一度出したか（受諾・辞退どちらでも）
 };
 
 
@@ -1377,6 +1380,14 @@ function onNextWeek(menuKey) {
     state.week++;
     state.roster = rollRoster();
     renderAll();
+    return;
+  }
+
+  // 練習試合の誘い。県大会までに一度も試合していないと、たまに入る。
+  // 受けると練習の代わりに試合になるので、練習・ストーリーより先に尋ねる。
+  const invite = maybeFriendlyInvite();
+  if (invite) {
+    openFriendlyInvite(invite, menuKey);
     return;
   }
 

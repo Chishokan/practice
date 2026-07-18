@@ -115,6 +115,32 @@ function getTournament(week) {
   return TOURNAMENTS.find(t => t.week === week) || null;
 }
 
+// 相手校の出場5人（表示専用）。名前は学校名から決定的に作る。
+// シミュレーションは相手を一団として扱うので、ここは見た目だけ。
+const OPP_SURNAMES = [
+  "佐藤", "鈴木", "高橋", "田中", "伊藤", "渡辺", "山本", "中村",
+  "小林", "加藤", "吉田", "山田", "斎藤", "松本", "井上", "木村",
+  "清水", "山口", "森", "池田",
+];
+
+function makeOppLineup(school) {
+  const positions = ["PG", "SG", "SF", "PF", "C"];
+  // 学校名を種にして、毎回同じ顔ぶれにする（Math.random は使わない）
+  const seed = [...school.name].reduce((a, c) => a + c.charCodeAt(0), 0);
+  const lineup = positions.map((pos, i) => ({
+    name: OPP_SURNAMES[(seed + i * 7) % OPP_SURNAMES.length],
+    pos,
+  }));
+
+  // 鷲尾がまだ自校に加入していなければ、相手校のSFとして出てくる。
+  // （加入する前は、どこか別の学校でプレーしている、という見立て）
+  if (typeof getPlayer === "function" && !getPlayer("鷲尾 陣")) {
+    const sf = lineup.find(p => p.pos === "SF");
+    if (sf) { sf.name = "鷲尾"; sf.isWashio = true; }
+  }
+  return lineup;
+}
+
 // 相手校のエンブレム。images/ にあれば出る。なければ何も出ない。
 // 学校名からファイル名を引く。
 const EMBLEMS = {
@@ -624,19 +650,21 @@ function quarterLabel(quarter) {
   return quarter >= 4 ? `延長${quarter - 3}` : `第${quarter + 1}Q`;
 }
 
-function simulateQuarter() {
+// 1セグメント（半クオーター）を回す。
+// 試合は 1クオーター=2セグメントの計8セグメントで進む。区切りごとに交代できる。
+// 疲労や相手の作戦変更は「クオーター末」だけ動く（従来と同じ挙動を保つ）。
+function simulateSegment() {
   const ms = matchState;
   const opp = ms.opponent;
 
-  // 攻撃回数。速攻やプレスが絡むと試合が速くなる。
   let pace = 16
     + OFF_TACTICS[ms.offTactic].pace + OFF_TACTICS[opp.off].pace
     + DEF_TACTICS[ms.defTactic].pace + DEF_TACTICS[opp.def].pace;
 
-  // 延長は5分。通常のクォーター（10分）の半分。
-  if (isOvertime()) pace = Math.round(pace / 2);
+  // 延長は1セグメントで完結（分割しない）。通常は半クオーターずつ。
+  pace = isOvertime() ? Math.round(pace / 2) : Math.round(pace / 2);
 
-  // 作戦タイムで選んだことを、このクオーターの実況の頭に置く
+  // アドバイスで選んだことを、このセグメントの実況の頭に置く
   if (ms.qChoiceResult) {
     addEvent(ms.qChoiceResult, "choice");
     ms.qChoiceResult = null;
@@ -647,32 +675,30 @@ function simulateQuarter() {
     simulatePossession(false);
   }
 
-  // --- 疲労の増減 ---
-  // 出ている5人は消耗し、ベンチは回復する。
-  // 延長は短いぶん、消耗も半分。
+  ms.qBuff = null; // 円陣などの効果は、次の1セグメントだけ
+
+  // ハーフを進める。2ハーフ終える（または延長）と、クオーター末の処理。
+  ms.half = (ms.half || 0) + 1;
+  const endOfQuarter = isOvertime() || ms.half >= 2;
+  if (!endOfQuarter) return;
+
+  // --- クオーター末：疲労・出場・相手の作戦変更 ---
   const otMult = isOvertime() ? 0.5 : 1;
   const load = (OFF_TACTICS[ms.offTactic].load + DEF_TACTICS[ms.defTactic].load) / 2 * otMult;
   for (const player of players) {
     if (ms.lineup.includes(player)) {
-      // 「タフガイ」は試合中の消耗が小さい
       const tough = hasSkill(player, "TOUGH") ? SKILLS.TOUGH.fatigueMult : 1;
-      // 1Qあたりの消耗。4倍して1試合ぶん。
-      // ここを大きくしすぎると、大会の連戦で決勝を戦えるチームがなくなる。
       const gain = 9 * load * (1.3 - player.base.stamina / 200) * tough;
       ms.fatigue[player.name] = Math.min(100, ms.fatigue[player.name] + gain);
       addBox(player, "min"); // 出場したクォーター数
     } else if (player.injuryWeeks === 0) {
-      // ベンチは回復するが、休養にはならない。
-      // ここを大きくすると（以前は8）、4Q座っているだけで疲労が全快し、
-      // 「試合に出さない＝休ませる」になってしまう。
-      // ベンチもアップして声を出している、くらいの回復に留める。
       ms.fatigue[player.name] = Math.max(0, ms.fatigue[player.name] - 4 * otMult);
     }
   }
   const awayLoad = (OFF_TACTICS[opp.off].load + DEF_TACTICS[opp.def].load) / 2 * otMult;
   ms.awayFatigue = Math.min(100, ms.awayFatigue + 9 * awayLoad * (1.3 - opp.base.stamina / 200));
 
-  ms.qBuff = null; // このクオーターぶんのバフは使い切り
+  ms.half = 0;
   ms.quarter++;
 
   // 相手は次のクォーターで戦術を変えてくることがある
@@ -684,6 +710,13 @@ function simulateQuarter() {
     const defKeys = Object.keys(DEF_TACTICS);
     opp.def = defKeys[Math.floor(Math.random() * defKeys.length)];
   }
+}
+
+// 1クオーター（2セグメント）を一気に回す。シミュレーション・テスト用。
+// 画面は simulateSegment を1つずつ呼ぶ（区切りで交代できるように）。
+function simulateQuarter() {
+  simulateSegment();
+  if (matchState.half !== 0) simulateSegment();
 }
 
 
@@ -755,6 +788,46 @@ function openMatch() {
   renderMatch();
 }
 
+// 練習試合の誘いを、受けるか断るか尋ねる。
+// 受けたら、その場で練習試合を始める（closeMatch がその週を消費する）。
+function openFriendlyInvite(opponent, menuKey) {
+  state.friendlyInviteDone = true; // 一度出したら、受けても断っても二度は出さない
+  const panel = document.getElementById("choice-panel");
+
+  panel.innerHTML = `
+    <div class="choice-head">
+      <span class="choice-tag">練習試合</span>
+      <h2>${opponent.name}から練習試合の誘い</h2>
+    </div>
+    <div class="story-text choice-text">
+      「よかったら、うちと一度やりませんか」——${opponent.name}から声がかかった。
+      県大会まで、まだ一度も試合をしていない。試合勘を養う、いい機会かもしれない。<br>
+      （受けると、この1週間は練習の代わりに試合になる）
+    </div>
+    <div class="choice-options">
+      <button class="choice-btn" data-inv="yes">
+        <div class="choice-label">受ける</div>
+        <div class="choice-desc">${opponent.name}と練習試合をする（1週間を使う）</div>
+      </button>
+      <button class="choice-btn" data-inv="no">
+        <div class="choice-label">断る</div>
+        <div class="choice-desc">今週は予定どおり練習する</div>
+      </button>
+    </div>`;
+
+  panel.querySelector('[data-inv="yes"]').addEventListener("click", () => {
+    document.getElementById("choice-overlay").classList.add("hidden");
+    document.getElementById("match-overlay").classList.remove("hidden");
+    startMatch(opponent); // 練習試合。closeMatch がこの週を消費する
+  });
+  panel.querySelector('[data-inv="no"]').addEventListener("click", () => {
+    document.getElementById("choice-overlay").classList.add("hidden");
+    onNextWeek(menuKey); // 断ったら、そのまま予定どおり週を進める
+  });
+
+  document.getElementById("choice-overlay").classList.remove("hidden");
+}
+
 // 大会に挑む。練習試合と違い、勝ち進む／敗退するという流れがある。
 function openTournament(tournament) {
   const ms = matchState;
@@ -800,6 +873,7 @@ function startMatch(opponent, tournament = null) {
   const ms = matchState;
   // 相手データは試合中に書き換える（戦術変更）ので、複製して元を汚さない
   ms.opponent = JSON.parse(JSON.stringify(opponent));
+  ms.oppLineup = makeOppLineup(ms.opponent); // 相手の出場5人（表示用）
   ms.tournament = tournament;
   ms.quarter = 0;
   ms.homeScore = 0;
@@ -815,6 +889,8 @@ function startMatch(opponent, tournament = null) {
   // 切り札は1試合につき、攻撃・守備それぞれ1Qだけ
   ms.trumpUsed = { off: false, def: false };
   ms.subView = null; // 交代・作戦の画面を開いているか
+  ms.half = 0;       // クオーター内のハーフ（0=前半, 1=後半）
+  ms.adviceUsed = { first: false, second: false }; // 前半・後半のアドバイス
   ms.qBuff = null;
   ms.qChoiceResult = null;
 
@@ -944,12 +1020,12 @@ function tacticSelect(id, tactics, current) {
 function lineupHeader() {
   return `
     <div class="lineup-row lineup-head">
+      <span class="lineup-swap-head">交代</span>
       <span></span>
       <span>選手</span>
       <span class="lineup-bar-head">疲労</span>
       ${DERIVED_STATS.map(d => `<span class="num" title="${d.label}">${d.label.slice(0, 2)}</span>`).join("")}
       <span class="lineup-box">成績</span>
-      <span></span>
     </div>`;
 }
 
@@ -980,6 +1056,10 @@ function playerRow(player, onCourt) {
 
   return `
     <div class="lineup-row ${onCourt ? "on-court" : ""}">
+      <button class="swap-btn ${onCourt ? "out" : "in"}" data-swap="${player.name}"
+              title="${onCourt ? "ベンチに下げる" : "コートに出す"}">
+        ${onCourt ? "▼" : "▲"}
+      </button>
       ${portrait(player, "small")}
       <span class="lineup-name">
         <span class="lineup-pos">${player.pos}</span> ${player.name} ${skills}
@@ -989,9 +1069,6 @@ function playerRow(player, onCourt) {
       </div>
       ${stats}
       <span class="lineup-box">${box.pts}点 ${box.reb}R ${box.ast}A</span>
-      <button class="swap-btn" data-swap="${player.name}">
-        ${onCourt ? "▼" : "▲"}
-      </button>
     </div>`;
 }
 
@@ -1131,6 +1208,8 @@ function renderPlaying() {
       </div>
     </div>
 
+    ${ms.subView || finished ? "" : renderOnCourt()}
+
     ${finished ? renderResult() + skills
       : ms.subView === "sub" ? renderSubPanel(bench)
       : ms.subView === "tactics" ? renderTacticsPanel()
@@ -1156,6 +1235,33 @@ function renderPlaying() {
     ${finished ? renderDoneButton() : ""}`;
 }
 
+// コートに立っている5人を、両チーム並べて見せる。
+// シミュレーションは相手を一団として扱うが、画面では顔ぶれが見えたほうが手に汗握る。
+function renderOnCourt() {
+  const ms = matchState;
+  const POS_ORDER = ["PG", "SG", "SF", "PF", "C"];
+  const home = ms.lineup
+    .slice()
+    .sort((a, b) => POS_ORDER.indexOf(a.pos) - POS_ORDER.indexOf(b.pos));
+  const away = ms.oppLineup || [];
+
+  const cell = (pos, name, extra = "") =>
+    `<span class="oncourt-p ${extra}"><b>${pos}</b> ${name}</span>`;
+
+  return `
+    <div class="oncourt">
+      <div class="oncourt-side">
+        <div class="oncourt-team">自校</div>
+        ${home.map(p => cell(p.pos, p.name.split(" ")[0])).join("")}
+      </div>
+      <div class="oncourt-vs">VS</div>
+      <div class="oncourt-side away">
+        <div class="oncourt-team">${ms.opponent.name}</div>
+        ${away.map(p => cell(p.pos, p.name, p.isWashio ? "washio" : "")).join("")}
+      </div>
+    </div>`;
+}
+
 // 試合中の操作。ふだんはこれ。作戦の要約と、交代・作戦を開くボタンだけ。
 // メンバー表と作戦の中身は、ボタンの裏（subView）に隠して画面を軽くする。
 function renderMatchControls(canPlay, tied) {
@@ -1163,6 +1269,11 @@ function renderMatchControls(canPlay, tied) {
   const opp = ms.opponent;
   const off = OFF_TACTICS[ms.offTactic];
   const def = DEF_TACTICS[ms.defTactic];
+
+  // 作戦変更はクオーターの切り替わり（＝ハーフの頭）でだけ。
+  const qBoundary = ms.half === 0 && ms.quarter < 4;
+  // アドバイスは前半・後半それぞれ1回まで。
+  const adviceAvail = ms.quarter < 4 && !ms.adviceUsed[gameHalf()];
 
   return `
     <div class="ctrl-box">
@@ -1186,15 +1297,24 @@ function renderMatchControls(canPlay, tied) {
 
       <div class="ctrl-menu">
         <button class="match-menu-btn" id="open-sub">🔄 交代</button>
-        <button class="match-menu-btn" id="open-tactics">📋 作戦変更</button>
+        ${qBoundary ? `<button class="match-menu-btn" id="open-tactics">📋 作戦変更</button>` : ""}
+        ${adviceAvail ? `<button class="match-menu-btn advice" id="open-advice">💬 アドバイス</button>` : ""}
       </div>
     </div>
 
     <button class="next-btn ${tied ? "cup-btn" : ""}" id="play-q" ${canPlay ? "" : "disabled"}>
       ${!canPlay ? "メンバーを5人にしてください"
-        : tied ? `▶ ${quarterLabel(ms.quarter)}を戦う（5分）`
-        : `▶ ${quarterLabel(ms.quarter)}を戦う`}
+        : tied ? `▶ ${quarterLabel(ms.quarter)}を戦う（延長5分）`
+        : `▶ ${segmentLabel()}`}
     </button>`;
+}
+
+// いま何を戦うか。前半・後半で分けて出す。
+function segmentLabel() {
+  const ms = matchState;
+  if (isOvertime()) return `${quarterLabel(ms.quarter)}を戦う`;
+  const half = ms.half === 0 ? "前半" : "後半";
+  return `${quarterLabel(ms.quarter)} ${half}を戦う`;
 }
 
 // 交代の画面。ここだけを大きく出す。横に長い表も、この中で完結する。
@@ -1306,7 +1426,9 @@ function renderMatch() {
   });
 
   const playBtn = document.getElementById("play-q");
-  if (playBtn) playBtn.addEventListener("click", onPlayQuarter);
+  if (playBtn) playBtn.addEventListener("click", onPlaySegment);
+  const adviceBtn = document.getElementById("open-advice");
+  if (adviceBtn) adviceBtn.addEventListener("click", openAdvice);
 
   const doneBtn = document.getElementById("match-done");
   if (doneBtn) doneBtn.addEventListener("click", closeMatch);
@@ -1407,13 +1529,15 @@ function quarterChoiceSet() {
 }
 
 // クオーター間の選択を出す。選ぶまで次に進めない。
-function openQuarterChoice() {
+// アドバイス（作戦タイム）。前半・後半それぞれ1回だけ。
+// 「アドバイスする」を押したときに開く。円陣・守備・落ち着く を選ぶ。
+function openAdvice() {
   const set = quarterChoiceSet();
   const panel = document.getElementById("qchoice-panel");
 
   panel.innerHTML = `
     <div class="qchoice-head">
-      <span class="qchoice-tag">作戦タイム</span>
+      <span class="qchoice-tag">アドバイス</span>
       <span class="qchoice-score">${matchState.homeScore} - ${matchState.awayScore}</span>
     </div>
     <div class="story-text qchoice-text">${set.text}</div>
@@ -1426,8 +1550,9 @@ function openQuarterChoice() {
     btn.addEventListener("click", () => {
       const opt = set.options[Number(btn.dataset.q)];
       matchState.qBuff = opt.qBuff;
-      // 選んだ結果を、次のクオーターの実況の頭に置く
       matchState.qChoiceResult = opt.result;
+      // この半分（前半／後半）のアドバイスは使い切り
+      matchState.adviceUsed[gameHalf()] = true;
       document.getElementById("qchoice-overlay").classList.add("hidden");
       renderMatch();
     });
@@ -1436,36 +1561,70 @@ function openQuarterChoice() {
   document.getElementById("qchoice-overlay").classList.remove("hidden");
 }
 
-function onPlayQuarter() {
+// 試合の前半（第1〜2Q）か後半（第3〜4Q）か。アドバイスの回数管理に使う。
+function gameHalf() {
+  return matchState.quarter < 2 ? "first" : "second";
+}
+
+// 区切りの進行モーダル。得点と、そのセグメントのハイライトを見せる。
+// 閉じると交代画面へ（進行と交代を分ける、という流れ）。
+function openProgressModal(fromIndex) {
   const ms = matchState;
+  const fresh = ms.events.slice(fromIndex);
+  // 見せ場（3P・スティールなど good）を優先。無ければ直近の出来事。
+  let highlights = fresh.filter(e => e.type === "good");
+  if (highlights.length < 2) highlights = highlights.concat(fresh.filter(e => e.type !== "good"));
+  highlights = highlights.slice(0, 3);
 
-  // 切り札を使ったクォーターかどうかを、走らせる前に控えておく
-  const usedOff = isTrump(OFF_TACTICS, ms.offTactic);
-  const usedDef = isTrump(DEF_TACTICS, ms.defTactic);
+  const panel = document.getElementById("progress-panel");
+  panel.innerHTML = `
+    <div class="progress-head">
+      <span class="progress-tag">試合経過</span>
+      <span class="progress-score">${ms.homeScore} - ${ms.awayScore}</span>
+    </div>
+    <div class="progress-events">
+      ${highlights.length
+        ? highlights.map(e => `<div class="ev ${e.type}">${e.text}</div>`).join("")
+        : `<div class="cond-note">拮抗した、静かな時間帯だった。</div>`}
+    </div>
+    <button class="next-btn" id="progress-go">▶ 交代を確認する</button>`;
 
-  simulateQuarter();
+  document.getElementById("progress-go").addEventListener("click", () => {
+    document.getElementById("progress-overlay").classList.add("hidden");
+    ms.subView = "sub"; // 進行のあとは交代画面へ
+    renderMatch();
+  });
+  document.getElementById("progress-overlay").classList.remove("hidden");
+}
 
-  // 使ったら、次のクォーターからは通常戦術に戻る。1Qだけの切り札。
-  if (usedOff) {
-    ms.trumpUsed.off = true;
-    ms.offTactic = "MOTION";
+// 1セグメント（半クオーター）を進める。
+function onPlaySegment() {
+  const ms = matchState;
+  const eventsBefore = ms.events.length;
+
+  simulateSegment();
+
+  const atQuarterEnd = ms.half === 0; // simulateSegment がクオーター末で half を 0 に戻す
+
+  // 切り札はそのクオーターだけ。クオーター末で通常戦術に戻す。
+  if (atQuarterEnd) {
+    if (isTrump(OFF_TACTICS, ms.offTactic)) { ms.trumpUsed.off = true; ms.offTactic = "MOTION"; }
+    if (isTrump(DEF_TACTICS, ms.defTactic)) { ms.trumpUsed.def = true; ms.defTactic = "MAN"; }
   }
-  if (usedDef) {
-    ms.trumpUsed.def = true;
-    ms.defTactic = "MAN";
-  }
 
-  // 同点のままでは終われない。バスケに引き分けはないので延長戦へ。
   const decided = ms.homeScore !== ms.awayScore;
-  if (ms.quarter >= 4) {
+
+  // 4クオーター終了：決着なら終了、同点なら延長（区切りは挟まない）
+  if (atQuarterEnd && ms.quarter >= 4) {
     if (decided) finishMatch();
-    else renderMatch(); // 延長へ。作戦タイムは挟まない。
+    else renderMatch();
     return;
   }
 
-  // 第1〜3Qの後は、次のQへ向けて作戦タイム（選択）を挟む。
-  openQuarterChoice();
+  // それ以外は区切り。進行モーダル → 交代画面。
+  openProgressModal(eventsBefore);
 }
+
 
 
 function finishMatch() {
