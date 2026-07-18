@@ -1602,17 +1602,15 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("menu-load").addEventListener("click", fromDrawer(() => loadGame()));
   document.getElementById("menu-reset").addEventListener("click", fromDrawer(resetGame));
 
-  // 続きがあればそこから、なければ4月1週目から始める。
-  // 第1話は起動時には出さず、4週目を終えた直後に出る（STORY の week:3）。
-  // まず1ヶ月ぶんプレイして部の空気に触れてから、始まりの回想として見せる。
+  // 続きがあればそこから、なければ4月1週目の話から始める
   if (readSave()) {
     loadGame();
   } else {
     state.roster = rollRoster(); // 初週の顔ぶれ
-    lastStory = runStory();      // week0 に話は無いので実際は何も出ない（将来の保険）
+    lastStory = runStory();
     renderAll();
     renderSaveInfo();
-    showStoryModal();
+    showStoryModal(); // 第1話を読ませてから始める
   }
 
   previewEnding(); // ?ending=champion のときだけ動く（確認用）
