@@ -127,13 +127,16 @@ function showRead(week) {
 
   const box = document.getElementById("gallery-read");
   box.classList.remove("hidden");
-  box.innerHTML = `
-    <div class="story-title">${saved.title}</div>
-    ${saved.cast?.length ? `
-      <div class="story-cast">
-        ${saved.cast.map(n => portraitByName(n, "mid", n)).join("")}
-      </div>` : ""}
-    <div class="story-text">${saved.text}</div>`;
+
+  // 読み返しも、ライブと同じページ送りノベルで見せる。
+  // 古いセーブには pages が無いので、その場合は text を1ページとして扱う。
+  const data = {
+    title: saved.title,
+    cast: saved.cast,
+    image: saved.image,
+    pages: saved.pages ?? (saved.text ? [saved.text] : []),
+  };
+  renderStoryPages(box, data, {}); // onFinal 無し＝前へ／次へだけ
   box.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 

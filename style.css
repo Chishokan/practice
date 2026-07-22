@@ -231,6 +231,92 @@ button, select { -webkit-tap-highlight-color: transparent; }
   margin-bottom: 10px;
 }
 
+/* ---- ノベルの1枚絵とページ送り ---- */
+
+/* 話の1枚絵。読み込めないときはタイトルを載せた枠に切り替える。 */
+.story-art {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  margin: -4px -4px 14px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #2a2016, #12151c);
+}
+
+.story-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* 画像があるときは、代わりの枠は隠す */
+.story-art-fallback { display: none; }
+
+.story-art.no-art { aspect-ratio: 16 / 7; }
+.story-art.no-art img { display: none; }
+.story-art.no-art .story-art-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 18px;
+  text-align: center;
+}
+.story-art.no-art .story-art-fallback span {
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  border-top: 1px solid #ffffff22;
+  border-bottom: 1px solid #ffffff22;
+  padding: 10px 6px;
+}
+
+/* 本文のページ。長くなっても読みやすいよう、上限を付けて中でスクロール */
+.story-page {
+  max-height: 46vh;
+  overflow-y: auto;
+}
+
+/* 前へ／ページ数／次へ */
+.story-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.page-count {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.1em;
+}
+
+.page-btn {
+  background: #232936;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: bold;
+  padding: 9px 16px;
+  min-width: 92px;
+  text-align: center;
+}
+
+.page-btn:hover:not(:disabled) { border-color: var(--accent); }
+.page-btn:disabled { opacity: 0.3; cursor: default; }
+.page-btn.ghost { background: transparent; }
+.page-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1a1005;
+}
+
 /* ============================================
    サブイベント（部員同士の話）
    メインストーリーとは色を変える。誰の話なのか分かるように。

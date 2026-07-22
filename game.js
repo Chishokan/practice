@@ -1144,9 +1144,22 @@ function showStoryModal() {
   }
 
   const panel = document.getElementById("story-panel");
+  const overlay = document.getElementById("story-overlay");
 
-  panel.innerHTML = `
-    ${lastChoice ? `
+  // 読み終えたら閉じて、同じ週のサブイベントがあれば続けて出す。
+  const finish = () => {
+    overlay.classList.add("hidden");
+    lastStory = null; // 一度読んだら消す。週送りで再表示されては困る。
+    lastChoice = null;
+    showSubModal();
+  };
+
+  if (lastStory) {
+    // メインストーリーは1枚絵つきのページ送りノベルで見せる
+    renderStoryPages(panel, lastStory, { finalLabel: "続ける", onFinal: finish });
+  } else {
+    // 選択の結果だけ（ストーリーのない週の分岐選択）
+    panel.innerHTML = `
       <div class="choice-result">
         <div class="choice-head">
           <span class="choice-tag">選択</span>
@@ -1154,31 +1167,72 @@ function showStoryModal() {
           <span class="chose">${lastChoice.label}</span>
         </div>
         <div class="story-text">${lastChoice.text}</div>
-      </div>` : ""}
-
-    ${lastStory ? `
-      <div class="story-modal-head">
-        <div class="story-title">${lastStory.title}</div>
       </div>
-      ${lastStory.cast?.length ? `
-        <div class="story-cast">
-          ${lastStory.cast.map(name => portraitByName(name, "mid", name)).join("")}
-        </div>` : ""}
-      <div class="story-text">${lastStory.text}</div>` : ""}
+      <button class="next-btn" id="story-close">続ける</button>`;
+    panel.querySelector("#story-close").addEventListener("click", finish);
+  }
 
-    <button class="next-btn" id="story-close">続ける</button>`;
-
-  const overlay = document.getElementById("story-overlay");
   overlay.classList.remove("hidden");
+}
 
-  document.getElementById("story-close").addEventListener("click", () => {
-    overlay.classList.add("hidden");
-    // 一度読んだら消す。週を進めるたびに再表示されては困る。
-    lastStory = null;
-    lastChoice = null;
-    // 同じ週にサブイベントも起きていたら、メインを読み終えてから出す
-    showSubModal();
-  });
+// ノベル形式のページ送り表示。ライブのモーダルと履歴の読み返しの両方で使う。
+//   data … { title, cast:[名前], image, pages:[本文…], tag? }
+//   opts.onFinal があれば、最後のページで opts.finalLabel のボタンを出し、
+//                 押すと onFinal を呼ぶ（＝ライブでは閉じる）。無ければ読み返し用。
+function renderStoryPages(container, data, opts = {}) {
+  const pages = data.pages?.length ? data.pages : [""];
+  let idx = 0;
+
+  const castHtml = data.cast?.length
+    ? `<div class="story-cast">${data.cast.map(n => portraitByName(n, "mid", n)).join("")}</div>`
+    : "";
+
+  // 1枚絵。無い／読み込めない場合は、話のタイトルを載せた枠を代わりに出す。
+  const artHtml = data.image
+    ? `<div class="story-art">
+         <img src="${data.image}" alt="${data.title}"
+              onerror="this.parentElement.classList.add('no-art')">
+         <div class="story-art-fallback"><span>${data.title}</span></div>
+       </div>`
+    : "";
+
+  function draw() {
+    const last = idx >= pages.length - 1;
+    const forward = last
+      ? (opts.onFinal
+          ? `<button class="page-btn primary" id="story-final">${opts.finalLabel ?? "閉じる"}</button>`
+          : `<span class="page-btn ghost" aria-disabled="true"></span>`)
+      : `<button class="page-btn" id="story-next">次へ ▶</button>`;
+
+    container.innerHTML = `
+      ${artHtml}
+      <div class="story-modal-head">
+        ${data.tag ? `<span class="sub-tag">${data.tag}</span>` : ""}
+        <div class="story-title">${data.title}</div>
+      </div>
+      ${castHtml}
+      <div class="story-text story-page">${pages[idx]}</div>
+      <div class="story-nav">
+        <button class="page-btn ghost" id="story-prev" ${idx === 0 ? "disabled" : ""}>◀ 前へ</button>
+        <span class="page-count">${idx + 1} / ${pages.length}</span>
+        ${forward}
+      </div>`;
+
+    const prev = container.querySelector("#story-prev");
+    if (prev) prev.addEventListener("click", () => { if (idx > 0) { idx--; draw(); scrollTop(); } });
+    const next = container.querySelector("#story-next");
+    if (next) next.addEventListener("click", () => { if (idx < pages.length - 1) { idx++; draw(); scrollTop(); } });
+    const fin = container.querySelector("#story-final");
+    if (fin && opts.onFinal) fin.addEventListener("click", opts.onFinal);
+  }
+
+  // ページを送ったら、本文の頭までスクロールを戻す（長い話で読みやすく）
+  function scrollTop() {
+    const t = container.querySelector(".story-page");
+    if (t && t.scrollIntoView) t.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  draw();
 }
 
 // サブイベント。メインストーリーと同じ週に起きたら、メインの後に出す。
