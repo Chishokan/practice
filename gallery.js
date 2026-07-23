@@ -84,6 +84,46 @@ function renderGallery() {
       </div>`;
   }).join("");
 
+  // ---- 大会の話（1回戦前・決勝前・決勝後）----
+  // 大会の節目に出る短い話。到達していない大会のぶんは伏せておく。
+  const CUP_ORDER = [
+    { key: "kengun", name: "県大会", icon: "🥈" },
+    { key: "national", name: "インターハイ（全国）", icon: "🔴" },
+    { key: "winter", name: "ウィンターカップ", icon: "🏆" },
+  ];
+
+  let seenCup = 0, totalCup = 0;
+  const cupRows = CUP_ORDER.map(cup => {
+    const def = CUP_STORY[cup.key];
+    if (!def) return "";
+
+    const slots = [];
+    Object.keys(def.before ?? {})
+      .sort((a, b) => Number(a) - Number(b))
+      .forEach(r => {
+        const label = Number(r) === 0 ? "1回戦前" : "決勝前";
+        slots.push({ k: cupStoryKey(cup.key, "before", r), label });
+      });
+    if (def.after) slots.push({ k: cupStoryKey(cup.key, "after"), label: "決勝後" });
+
+    const rows = slots.map(s => {
+      const saved = state.cupRead?.[s.k];
+      totalCup++;
+      if (saved) seenCup++;
+      return `
+        <button class="gal-row ${saved ? "" : "locked"}"
+                ${saved ? `data-cup="${s.k}"` : "disabled"}>
+          <span class="gal-when">${s.label}</span>
+          <span class="gal-title">${saved ? saved.title : "???"}</span>
+          <span class="gal-mark">${saved ? "読了" : "未読"}</span>
+        </button>`;
+    }).join("");
+
+    return `
+      <div class="section-label">${cup.icon} ${cup.name}</div>
+      <div class="gal-list">${rows}</div>`;
+  }).join("");
+
   const seenMain = state.storySeen.length;
   const seenSub = SUB_EVENTS.reduce((n, s) => n + subProgress(s.key), 0);
   const totalSub = SUB_EVENTS.reduce((n, s) => n + s.steps.length, 0);
@@ -96,11 +136,17 @@ function renderGallery() {
 
     <div class="gal-summary">
       メインストーリー ${seenMain} / ${STORY.length}
+      大会の話 ${seenCup} / ${totalCup}
       部員の話 ${seenSub} / ${totalSub}
     </div>
 
     <div class="section-label">メインストーリー<span class="section-note">毎月1週目</span></div>
     <div class="gal-list">${mainRows}</div>
+
+    <div class="section-label">
+      大会の話<span class="section-note">1回戦前・決勝前・決勝後／決勝に届いた年だけ読める話もある</span>
+    </div>
+    ${cupRows}
 
     <div class="section-label">
       部員の話<span class="section-note">★が多いほど起きにくい／三宅の書き込みは当てにならないこともある</span>
@@ -113,6 +159,9 @@ function renderGallery() {
 
   panel.querySelectorAll("[data-story]").forEach(btn => {
     btn.addEventListener("click", () => showRead(Number(btn.dataset.story)));
+  });
+  panel.querySelectorAll("[data-cup]").forEach(btn => {
+    btn.addEventListener("click", () => showCupRead(btn.dataset.cup));
   });
   panel.querySelectorAll("[data-sub]").forEach(btn => {
     btn.addEventListener("click", () =>
@@ -137,6 +186,22 @@ function showRead(week) {
     pages: saved.pages ?? (saved.text ? [saved.text] : []),
   };
   renderStoryPages(box, data, {}); // onFinal 無し＝前へ／次へだけ
+  box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+// 読み返し（大会の話）。メインと同じページ送りで見せる。
+function showCupRead(key) {
+  const saved = state.cupRead?.[key];
+  if (!saved) return;
+
+  const box = document.getElementById("gallery-read");
+  box.classList.remove("hidden");
+  renderStoryPages(box, {
+    title: saved.title,
+    cast: saved.cast,
+    image: saved.image,
+    pages: saved.pages ?? (saved.text ? [saved.text] : []),
+  }, {});
   box.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 

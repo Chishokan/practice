@@ -457,6 +457,11 @@ const state = {
   subLast: {},     // 各サブイベントが最後に進んだ週 { key: 週 }
   quitter: null,   // 退部した部員（冬に効いてくる）
   friendlyInviteDone: false, // 練習試合の誘いを一度出したか（受諾・辞退どちらでも）
+  // 大会の進行 { key, round, bracket, end }。1回戦ごとにメイン画面へ戻るため、
+  // 「どこまで勝ち上がったか」をセーブされる側に持たせる。終わったら null。
+  cup: null,
+  cupSeen: [],     // 既に読んだ大会エピソードのキー
+  cupRead: {},     // 実際に読んだ本文 { キー: {title,pages,cast,image} }
 };
 
 
@@ -1107,6 +1112,27 @@ function renderNextButton() {
     return;
   }
 
+  // 大会の途中（1回戦を勝って、いったん戻ってきた）。
+  // ここを大会週の判定より先に置く。でないと「大会に挑む」が出て、
+  // 勝ち上がりを捨てて最初からやり直しになってしまう。
+  if (state.cup && !state.cup.end) {
+    const cupT = TOURNAMENTS.find(x => x.key === state.cup.key);
+    const round = cupT?.rounds[state.cup.round];
+    if (cupT && round) {
+      const wins = state.cup.bracket.filter(b => b.win).length;
+      hint.textContent = "";
+      board.className = "train-blocked";
+      board.innerHTML = `<div class="blocked-note">
+             ${cupT.icon} ${cupT.name} — ${wins}回戦突破。
+             次は <b>${round.label}</b>（${round.school.name}）。
+           </div>
+           <button class="next-btn cup-btn" id="cup-next">▶ ${round.label}に進む</button>`;
+      document.getElementById("cup-next")
+        ?.addEventListener("click", () => startCupRound());
+      return;
+    }
+  }
+
   if (tournament || forced) {
     hint.textContent = "";
     board.className = "train-blocked";
@@ -1171,6 +1197,23 @@ function showStoryModal() {
       <button class="next-btn" id="story-close">続ける</button>`;
     panel.querySelector("#story-close").addEventListener("click", finish);
   }
+
+  overlay.classList.remove("hidden");
+}
+
+// 大会の節目に出す話（1回戦前・決勝前・決勝後）。
+// メインストーリーと同じページ送りで見せて、読み終わったら onDone へ進む。
+function showCupStory(data, onDone) {
+  const panel = document.getElementById("story-panel");
+  const overlay = document.getElementById("story-overlay");
+
+  renderStoryPages(panel, data, {
+    finalLabel: "続ける",
+    onFinal: () => {
+      overlay.classList.add("hidden");
+      if (onDone) onDone();
+    },
+  });
 
   overlay.classList.remove("hidden");
 }
@@ -1425,7 +1468,7 @@ function onNextWeek(menuKey) {
   const tournament = getTournament(state.week);
   if (tournament) {
     if (canEnter(tournament)) {
-      openTournament(tournament);
+      enterTournament(tournament); // 節目のエピソードを挟んでから1回戦へ
       return;
     }
     // 出場権がない大会は見送る。その週は何もできない。
@@ -1565,6 +1608,8 @@ function loadGame() {
   if (!state.subs) state.subs = {};
   if (!state.subLast) state.subLast = {};
   if (!state.storyRead) state.storyRead = {};
+  if (!state.cupSeen) state.cupSeen = [];
+  if (!state.cupRead) state.cupRead = {};
   matchState.lineup = [];   // 古い選手への参照を捨てる
   matchState.tournament = null;
   lastEvent = null;

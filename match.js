@@ -784,6 +784,14 @@ function applyMatchExperience() {
 // ---- 9. 試合の開始と終了 ------------------------------
 
 function openMatch() {
+  // 大会の最中は練習試合を組ませない。
+  // 週の進み方（大会は最後にまとめて1週）が壊れてしまうため。
+  if (state.cup && !state.cup.end) {
+    if (typeof alert === "function") {
+      alert("大会の最中です。\n次の試合を終えてから、練習試合を組んでください。");
+    }
+    return;
+  }
   matchState.phase = "setup";
   matchState.opponent = null;
   matchState.tournament = null;
@@ -838,14 +846,55 @@ function openFriendlyInvite(opponent, menuKey) {
 }
 
 // 大会に挑む。練習試合と違い、勝ち進む／敗退するという流れがある。
+//
+// 進行は state.cup に持たせる。1回戦ごとにメイン画面へ戻るので、
+// 試合画面を閉じても「どこまで勝ち上がったか」が残っている必要がある。
+// （matchState は保存されないが、state はセーブされる）
 function openTournament(tournament) {
   const ms = matchState;
+  state.cup = { key: tournament.key, round: 0, bracket: [], end: null };
   ms.tournament = tournament;
   ms.round = 0;
-  ms.bracket = [];       // 各試合の結果を積んでいく
-  ms.tournamentEnd = null; // "won" | "lost"
+  ms.bracket = state.cup.bracket; // 同じ配列を共有する
+  ms.tournamentEnd = null;        // "won" | "lost"
   document.getElementById("match-overlay").classList.remove("hidden");
   startMatch(tournament.rounds[0].school, tournament);
+}
+
+// 画面から大会に入るときの入口。
+// openTournament と違い、節目のエピソードを先に読ませる。
+function enterTournament(tournament) {
+  state.cup = { key: tournament.key, round: 0, bracket: [], end: null };
+  startCupRound();
+}
+
+// いまの回戦を始める。直前のエピソードがあれば、先に読ませてから試合へ。
+// メイン画面の「◯回戦に進む」からも、ここに入る。
+function startCupRound() {
+  const cup = state.cup;
+  if (!cup || cup.end) return;
+  const t = TOURNAMENTS.find(x => x.key === cup.key);
+  if (!t) return;
+
+  const go = () => openCupMatch(t);
+  const ep = getCupBefore(cup.key, cup.round);
+  if (ep) {
+    showCupStory(takeCupStory(ep, cup.key, "before", cup.round), go);
+  } else {
+    go();
+  }
+}
+
+// 大会の1試合を開く。state.cup の進行を matchState に写してから始める。
+function openCupMatch(t) {
+  const ms = matchState;
+  const cup = state.cup;
+  ms.tournament = t;
+  ms.round = cup.round;
+  ms.bracket = cup.bracket;
+  ms.tournamentEnd = cup.end;
+  document.getElementById("match-overlay").classList.remove("hidden");
+  startMatch(t.rounds[cup.round].school, t);
 }
 
 function closeMatch() {
@@ -860,29 +909,63 @@ function closeMatch() {
     if (typeof confirm === "function" && !confirm(msg)) return;
   }
 
-  // 大会が終わっていたら、その週を消費して次の週へ進む
-  const wasWinter = ms.tournament?.key === "winter" && ms.tournamentEnd;
+  document.getElementById("match-overlay").classList.add("hidden");
 
-  if (ms.tournament && ms.tournamentEnd) {
-    state.tournaments[ms.tournament.key] = ms.tournamentEnd;
-    tickBuff();
-    state.week++;
-    state.roster = rollRoster(); // 次の練習週は新しい顔ぶれで始める
-    ms.tournament = null;
-  } else if (!ms.tournament && ms.phase === "done") {
-    // 練習試合も1週間を使う。試合をした週は練習できない。
-    //
-    // 以前は週を消費しなかったので、練習試合が
-    // 「タダで経験値が入り、ベンチの疲労も抜ける」手段になっていた。
-    // 試合を組むかどうかが選択になっていなかった。
+  const cup = state.cup;
+
+  // --- 大会が終わった（優勝 or 敗退）---
+  // ms.tournament も見るのは、大会の最中に練習試合を閉じた場合に
+  // こちらへ迷い込まないようにするため。
+  if (ms.tournament && cup && cup.end) {
+    const t = TOURNAMENTS.find(x => x.key === cup.key);
+    // 決勝まで辿り着いた年だけ、決勝後の話が出る
+    const reachedFinal = ms.round >= t.rounds.length - 1;
+    const ep = reachedFinal ? getCupAfter(cup.key) : null;
+    if (ep) {
+      showCupStory(takeCupStory(ep, cup.key, "after"), () => finishCup(cup));
+    } else {
+      finishCup(cup);
+    }
+    return;
+  }
+
+  // --- 大会の途中（勝ち上がって、いったんメイン画面へ戻る）---
+  // 週はまだ消費しない。次の回戦は、メイン画面のボタンから入る。
+  if (ms.tournament && cup && !cup.end) {
+    renderAll();
+    saveGame(true);
+    return;
+  }
+
+  // --- 練習試合 ---
+  // 練習試合も1週間を使う。試合をした週は練習できない。
+  //
+  // 以前は週を消費しなかったので、練習試合が
+  // 「タダで経験値が入り、ベンチの疲労も抜ける」手段になっていた。
+  // 試合を組むかどうかが選択になっていなかった。
+  if (!ms.tournament && ms.phase === "done") {
     tickBuff();
     state.week++;
     state.roster = rollRoster(); // 次の練習週は新しい顔ぶれで始める
     logFriendlyWeek();
   }
 
-  document.getElementById("match-overlay").classList.add("hidden");
   renderAll(); // 練習画面に疲労と成長を反映する
+  saveGame(true);
+}
+
+// 大会を締める。ここで初めて1週間を使い、結果を残す。
+function finishCup(cup) {
+  const wasWinter = cup.key === "winter";
+
+  state.tournaments[cup.key] = cup.end;
+  tickBuff();
+  state.week++;
+  state.roster = rollRoster(); // 次の練習週は新しい顔ぶれで始める
+  state.cup = null;
+  matchState.tournament = null;
+
+  renderAll();
   saveGame(true);
 
   // ウィンターカップが終わったら、そこで1年が終わる
@@ -1408,9 +1491,13 @@ function renderResult() {
 
 function renderDoneButton() {
   const ms = matchState;
-  // 大会の途中で勝った場合だけ「次の試合へ」になる
+  // 大会の途中で勝った場合は、いったんメイン画面へ戻る。
+  // 次の回戦へは、メイン画面のボタンから改めて入る。
   if (ms.tournament && !ms.tournamentEnd) {
-    return `<button class="next-btn" id="next-round">▶ 次の試合へ</button>`;
+    const next = ms.tournament.rounds[ms.round + 1];
+    return `<button class="next-btn" id="match-done">
+      ▶ ${next ? `コートを出る（次は${next.label}）` : "コートを出る"}
+    </button>`;
   }
   return `<button class="next-btn" id="match-done">
     ${ms.tournament ? "大会を終える" : "練習に戻る"}
@@ -1456,8 +1543,6 @@ function renderMatch() {
   const doneBtn = document.getElementById("match-done");
   if (doneBtn) doneBtn.addEventListener("click", closeMatch);
 
-  const nextBtn = document.getElementById("next-round");
-  if (nextBtn) nextBtn.addEventListener("click", nextRound);
 
   const off = document.getElementById("off-tactic");
   if (off) off.addEventListener("change", e => {
@@ -1676,6 +1761,22 @@ function finishMatch() {
       ms.tournamentEnd = "won";
       applyChampionBonus();
     }
+
+    // 勝ち上がりを state 側にも残す。試合画面を閉じてメイン画面へ戻っても、
+    // 「次はどの回戦か」が分かるようにしておく。
+    if (state.cup && state.cup.key === ms.tournament.key) {
+      state.cup.bracket = ms.bracket;
+      if (ms.tournamentEnd) {
+        state.cup.end = ms.tournamentEnd;
+      } else {
+        // 次の回戦へ。連戦だが、大会には休養日がある。
+        // ここが小さすぎると、決勝に着く頃には全員が限界で勝負にならない。
+        state.cup.round = ms.round + 1;
+        for (const player of players) {
+          player.fatigue = Math.max(0, player.fatigue - 25);
+        }
+      }
+    }
   }
 
   recordHistory(win);
@@ -1755,17 +1856,14 @@ function rollMatchSkillsForAll(win) {
   return got;
 }
 
-// 次の試合へ（大会の勝ち上がり）
+// 次の試合へ（大会の勝ち上がり）。
+//
+// 画面からは使わない（1回戦ごとにメイン画面へ戻り、そこから startCupRound で入る）。
+// 勝ち上がりと休養は finishMatch で済んでいるので、ここは次の相手を開くだけ。
+// 一気に大会を回すシミュレーション（バランス検証）用に残してある。
 function nextRound() {
   const ms = matchState;
-  ms.round++;
-
-  // 連戦なので疲労は残るが、大会には休養日がある。
-  // ここが小さすぎると、決勝に着く頃には全員が限界になって勝負にならない。
-  for (const player of players) {
-    player.fatigue = Math.max(0, player.fatigue - 25);
-  }
-
+  ms.round = state.cup ? state.cup.round : ms.round + 1;
   startMatch(ms.tournament.rounds[ms.round].school, ms.tournament);
 }
 
